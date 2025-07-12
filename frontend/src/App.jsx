@@ -1,11 +1,15 @@
 import Header from "./components/Header"
+import Footer from "./components/Footer";
+import Filter from "./components/Filter";
 
 function App() {
     return (
-    <div className="App">
-      <Header/>
-    </div>
-  );
+        <>
+            <Header/>
+            <Filter/>
+            <Footer/>
+        </>
+    );
 }
 
 export default App
