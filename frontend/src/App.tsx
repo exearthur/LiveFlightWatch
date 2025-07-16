@@ -24,12 +24,16 @@ function App() {
     <div>
     <Navbar className="bg-black shadow-md">
       <NavBody className="flex items-center justify-between px-4 py-2">
-        <NavbarLogo className="text-xl font-bold">Live Flight Watch</NavbarLogo>
+        <NavbarLogo/>
+        <span className="text-xl font-bold">Live Flight Watch</span>
         <NavItems items={navLinks} className="hidden md:flex" />
         
       </NavBody>
     </Navbar>
     </div>
+    
+    
+
   )
 }
 
