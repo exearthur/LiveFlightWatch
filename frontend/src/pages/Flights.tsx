@@ -1,10 +1,11 @@
 import { AlertTriangle, PlaneTakeoff, RefreshCw, Search } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FlightsTable } from "@/components/flights/FlightsTable";
 import { FlightsTableSkeleton } from "@/components/flights/FlightsTableSkeleton";
 import { useFlights } from "@/hooks/useFlights";
+import { ALL_AIRLINES, filterFlightsByAirline, getUniqueAirlines } from "@/lib/flightFilters";
 import type { FlightDirection } from "@/types/flight";
 
 const IATA_CODE_PATTERN = /^[A-Za-z]{3}$/;
@@ -19,12 +20,24 @@ function timeAgo(iso: string): string {
 export default function Flights() {
   const [airportInput, setAirportInput] = useState("");
   const [direction, setDirection] = useState<FlightDirection>("departures");
+  const [selectedAirline, setSelectedAirline] = useState<string>(ALL_AIRLINES);
 
   const isValidAirport = IATA_CODE_PATTERN.test(airportInput);
   const { data, isLoading, isFetching, isError, error, refetch } = useFlights(
     airportInput,
     direction,
   );
+
+  const airlineOptions = useMemo(
+    () => getUniqueAirlines(data?.flights ?? []),
+    [data],
+  );
+  const filteredFlights = useMemo(
+    () => filterFlightsByAirline(data?.flights ?? [], selectedAirline),
+    [data, selectedAirline],
+  );
+  const isFilteredEmpty =
+    selectedAirline !== ALL_AIRLINES && !!data && filteredFlights.length === 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -76,11 +89,30 @@ export default function Flights() {
           </Button>
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label htmlFor="airline" className="text-sm text-neutral-500 dark:text-neutral-400">
+            Airline
+          </label>
+          <select
+            id="airline"
+            value={selectedAirline}
+            onChange={(e) => setSelectedAirline(e.target.value)}
+            className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+          >
+            <option value={ALL_AIRLINES}>All Airlines</option>
+            {airlineOptions.map((airline) => (
+              <option key={airline} value={airline}>
+                {airline}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {isValidAirport && data && (
           <div className="ml-auto flex items-center gap-3 text-sm text-neutral-500 dark:text-neutral-400">
             <span>
               <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                {data.flights.length}
+                {filteredFlights.length}
               </span>{" "}
               flights · updated {timeAgo(data.fetched_at)}
               {data.cached && " (cached)"}
@@ -127,8 +159,15 @@ export default function Flights() {
         </div>
       )}
 
-      {isValidAirport && data && !isError && (
-        <FlightsTable flights={data.flights} direction={direction} />
+      {isValidAirport && data && !isError && isFilteredEmpty && (
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-300 py-16 text-center text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+          <PlaneTakeoff className="size-8 text-neutral-400 dark:text-neutral-600" />
+          <p>No flights found for this airline.</p>
+        </div>
+      )}
+
+      {isValidAirport && data && !isError && !isFilteredEmpty && (
+        <FlightsTable flights={filteredFlights} direction={direction} />
       )}
     </div>
   );
