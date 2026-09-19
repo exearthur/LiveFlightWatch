@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     aviationstack_api_key: str
     aviationstack_base_url: str = "https://api.aviationstack.com/v1/flights"
-    cache_ttl_seconds: int = 60
+    cache_ttl_seconds: int = 300
     cors_origins: str = "http://localhost:5173"
 
     @property
