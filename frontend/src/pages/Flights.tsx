@@ -1,10 +1,11 @@
 import { AlertTriangle, PlaneTakeoff, RefreshCw, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FlightsTable } from "@/components/flights/FlightsTable";
 import { FlightsTableSkeleton } from "@/components/flights/FlightsTableSkeleton";
 import { useFlights } from "@/hooks/useFlights";
+import { useRecentAirports } from "@/hooks/useRecentAirports";
 import { ALL_AIRLINES, filterFlightsByAirline, getUniqueAirlines } from "@/lib/flightFilters";
 import type { FlightDirection } from "@/types/flight";
 
@@ -27,6 +28,13 @@ export default function Flights() {
     airportInput,
     direction,
   );
+  const { recentAirports, addRecentAirport } = useRecentAirports();
+
+  useEffect(() => {
+    if (isValidAirport && data && !isError) {
+      addRecentAirport(airportInput);
+    }
+  }, [isValidAirport, data, isError, airportInput, addRecentAirport]);
 
   const airlineOptions = useMemo(
     () => getUniqueAirlines(data?.flights ?? []),
@@ -72,6 +80,20 @@ export default function Flights() {
               className="w-36 rounded-md border border-neutral-300 bg-white py-2 pr-3 pl-9 font-mono uppercase text-neutral-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
             />
           </div>
+          {recentAirports.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {recentAirports.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setAirportInput(code)}
+                  className="rounded-full border border-neutral-300 px-2.5 py-1 font-mono text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">
