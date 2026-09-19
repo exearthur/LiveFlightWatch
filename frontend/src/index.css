@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -17,8 +19,13 @@
   --ring: var(--color-sky-500);
 }
 
+/*
+ * Falls back to the OS preference only when the user hasn't made an
+ * explicit choice (the `.light` class below is applied whenever they
+ * have chosen light mode explicitly, even if the OS prefers dark).
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --primary: var(--color-sky-500);
@@ -32,6 +39,26 @@
     --input: oklch(1 0 0 / 15%);
     --ring: var(--color-sky-500);
   }
+}
+
+/*
+ * Explicit override applied via the manual dark-mode toggle (see
+ * `useTheme`/`ThemeToggle`). Higher specificity than the bare `:root`
+ * selectors above, so it always wins regardless of OS preference.
+ */
+:root.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --primary: var(--color-sky-500);
+  --primary-foreground: oklch(0.145 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --accent: var(--color-sky-950);
+  --accent-foreground: var(--color-sky-300);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: var(--color-sky-500);
 }
 
 @theme inline {
