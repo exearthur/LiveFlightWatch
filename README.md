@@ -1,5 +1,88 @@
 # LiveFlightWatch
-This is a simple web dashboard that pulls flight status data and displays it cleanly, with delay warnings and live updates.
+
+A universal flight tracker — live departures and arrivals for any airport worldwide, plus lookup by flight number. No waiting on the slow board at the gate.
+
+**Live:** [live-flight-watch-gfn2.vercel.app](https://live-flight-watch-gfn2.vercel.app)
+
+## Features
+
+- Live departures/arrivals for any airport by IATA code (e.g. `JFK`, `LHR`)
+- Flight number lookup (e.g. `AA100`) as an alternative search mode
+- Filter results by airline and status
+- Favorites — save a search and jump back to it from the Home page
+- Recently-searched airports for quick re-access
+- Light/dark mode
+- Desktop table + mobile card layout
+- Searches are shareable via URL (filters sync to query params) and support browser back/forward
+- Graceful handling of the flight-data provider's rate limit (a "quota reached" state instead of a generic error, with polling paused until it clears)
+
+## Tech stack
+
+**Backend** (`backend/`): Python, FastAPI, httpx (async), Pydantic — a thin proxy over the [AviationStack](https://aviationstack.com/) API with an in-memory TTL cache and a provider-adapter layer so the data source can be swapped later.
+
+**Frontend** (`frontend/`): React 19, TypeScript, Vite, Tailwind CSS v4, TanStack Query, React Router.
+
+**Testing**: pytest (backend), Vitest + React Testing Library (frontend).
+
+**CI**: GitHub Actions runs both test suites, plus frontend lint and build, on every push to `main` and every PR (`.github/workflows/ci.yml`).
+
+## Project structure
+
+```
+backend/
+  app/
+    routers/       FastAPI route handlers
+    services/       caching/orchestration between routers and providers
+    providers/      FlightProvider interface + the AviationStack implementation
+    models/         Pydantic response schemas
+    core/           TTL cache
+  tests/
+frontend/
+  src/
+    pages/          Home, Flights, About, Contact
+    components/     FlightsTable and shared UI
+    hooks/          useFlights, useFlightLookup, useFavorites, useRecentAirports, useTheme
+    lib/            API client, filter helpers
+```
+
+## Local development
+
+### Backend
+
+```
+cd backend
+python -m venv .venv && .venv\Scripts\activate   # or `source .venv/bin/activate` on macOS/Linux
+pip install -r requirements.txt
+cp .env.example .env   # then fill in a real AVIATIONSTACK_API_KEY from aviationstack.com
+uvicorn app.main:app --reload --port 8000
+```
+
+API docs are then available at `http://localhost:8000/docs`.
+
+### Frontend
+
+```
+cd frontend
+npm install
+cp .env.example .env   # VITE_API_URL should point at the backend above (http://localhost:8000 by default)
+npm run dev
+```
+
+## Testing
+
+```
+cd backend && pytest -v
+cd frontend && npm run test    # or `npm run test:watch`
+```
+
+Also run `npm run lint` and `npm run build` in `frontend/` before pushing — CI checks both.
+
+## API reference
+
+- `GET /api/flights?airport={IATA}&type=departures|arrivals` — flights for an airport (defaults to `departures`).
+- `GET /api/flights/lookup?flight_number={code}` — a specific flight (e.g. `AA100`).
+
+Both return `429` if the upstream provider's rate limit is hit, and `502` on other upstream failures.
 
 ## Deployment
 
