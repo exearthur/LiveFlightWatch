@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 import app.routers.flights as flights_router_module
 from app.main import app
-from app.models.flight import FlightsResponse
+from app.models.flight import FlightLookupResponse, FlightsResponse
 from app.providers.base import ProviderError
 
 client = TestClient(app)
@@ -19,6 +19,11 @@ class _FakeService:
         self._error = error
 
     async def get_flights(self, airport, flight_type):
+        if self._error is not None:
+            raise self._error
+        return self._response
+
+    async def get_flight_by_number(self, flight_number):
         if self._error is not None:
             raise self._error
         return self._response
@@ -89,3 +94,64 @@ def test_flight_type_defaults_to_departures(monkeypatch):
 
     assert response.status_code == 200
     assert seen["flight_type"] == "departures"
+
+
+# --- GET /api/flights/lookup -------------------------------------------------
+
+
+def test_lookup_invalid_flight_number_returns_422():
+    response = client.get("/api/flights/lookup", params={"flight_number": "!!invalid!!"})
+
+    assert response.status_code == 422
+
+
+def test_lookup_missing_flight_number_returns_422():
+    response = client.get("/api/flights/lookup")
+
+    assert response.status_code == 422
+
+
+def test_lookup_provider_error_is_mapped_to_502(monkeypatch):
+    fake_service = _FakeService(error=ProviderError("upstream failed"))
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+
+    response = client.get("/api/flights/lookup", params={"flight_number": "AA100"})
+
+    assert response.status_code == 502
+    assert "upstream failed" in response.json()["detail"]
+
+
+def test_lookup_valid_request_returns_flight_lookup_response(monkeypatch):
+    sample_response = FlightLookupResponse(
+        flight_number="AA100",
+        fetched_at=datetime.now(timezone.utc),
+        cached=False,
+        flights=[],
+    )
+    fake_service = _FakeService(response=sample_response)
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+
+    response = client.get("/api/flights/lookup", params={"flight_number": "aa100"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["flight_number"] == "AA100"
+    assert body["flights"] == []
+
+
+def test_lookup_with_no_matching_flights_returns_200_with_empty_list(monkeypatch):
+    # AviationStack returning zero matches for a flight number is a normal,
+    # successful outcome (e.g. flight not operating today) -- not an error.
+    sample_response = FlightLookupResponse(
+        flight_number="ZZ9999",
+        fetched_at=datetime.now(timezone.utc),
+        cached=False,
+        flights=[],
+    )
+    fake_service = _FakeService(response=sample_response)
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+
+    response = client.get("/api/flights/lookup", params={"flight_number": "ZZ9999"})
+
+    assert response.status_code == 200
+    assert response.json()["flights"] == []

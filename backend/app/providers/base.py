@@ -12,3 +12,7 @@ class FlightProvider(ABC):
     @abstractmethod
     async def get_flights(self, airport: str, flight_type: FlightType) -> list[Flight]:
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_flight_by_number(self, flight_number: str) -> list[Flight]:
+        raise NotImplementedError

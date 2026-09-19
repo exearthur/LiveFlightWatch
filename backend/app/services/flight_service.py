@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.core.cache import TTLCache
-from app.models.flight import Flight, FlightsResponse, FlightType
+from app.models.flight import Flight, FlightLookupResponse, FlightsResponse, FlightType
 from app.providers.base import FlightProvider
 
 
@@ -29,6 +29,28 @@ class FlightService:
         return FlightsResponse(
             airport=airport,
             type=flight_type,
+            fetched_at=datetime.now(timezone.utc),
+            cached=False,
+            flights=flights,
+        )
+
+    async def get_flight_by_number(self, flight_number: str) -> FlightLookupResponse:
+        cache_key = f"lookup:{flight_number}"
+        cached_flights = self._cache.get(cache_key)
+
+        if cached_flights is not None:
+            return FlightLookupResponse(
+                flight_number=flight_number,
+                fetched_at=datetime.now(timezone.utc),
+                cached=True,
+                flights=cached_flights,
+            )
+
+        flights = await self._provider.get_flight_by_number(flight_number)
+        self._cache.set(cache_key, flights)
+
+        return FlightLookupResponse(
+            flight_number=flight_number,
             fetched_at=datetime.now(timezone.utc),
             cached=False,
             flights=flights,
