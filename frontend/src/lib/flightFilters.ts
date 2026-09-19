@@ -1,6 +1,7 @@
-import type { Flight } from "@/types/flight";
+import type { Flight, FlightStatus } from "@/types/flight";
 
 export const ALL_AIRLINES = "all" as const;
+export const ALL_STATUSES = "all" as const;
 
 /**
  * Unique airline names present in the given flights, sorted alphabetically.
@@ -24,4 +25,16 @@ export function filterFlightsByAirline(
 ): Flight[] {
   if (!airline || airline === ALL_AIRLINES) return flights;
   return flights.filter((flight) => flight.airline === airline);
+}
+
+/**
+ * Filters flights down to the selected status. Passing `ALL_STATUSES`
+ * (or any falsy value) returns all flights unchanged.
+ */
+export function filterFlightsByStatus(
+  flights: Flight[],
+  status: FlightStatus | typeof ALL_STATUSES,
+): Flight[] {
+  if (!status || status === ALL_STATUSES) return flights;
+  return flights.filter((flight) => flight.status === status);
 }
