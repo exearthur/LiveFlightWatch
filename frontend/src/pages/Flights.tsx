@@ -1,11 +1,13 @@
-import { AlertTriangle, PlaneTakeoff, RefreshCw, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Clock, PlaneTakeoff, RefreshCw, Search } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { FlightsTable } from "@/components/flights/FlightsTable";
 import { FlightsTableSkeleton } from "@/components/flights/FlightsTableSkeleton";
 import { useFlights } from "@/hooks/useFlights";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
+import { ApiError } from "@/lib/api";
 import {
   ALL_AIRLINES,
   ALL_STATUSES,
@@ -35,12 +37,40 @@ function timeAgo(iso: string): string {
 }
 
 export default function Flights() {
-  const [airportInput, setAirportInput] = useState("");
-  const [direction, setDirection] = useState<FlightDirection>("departures");
-  const [selectedAirline, setSelectedAirline] = useState<string>(ALL_AIRLINES);
-  const [selectedStatus, setSelectedStatus] = useState<FlightStatus | typeof ALL_STATUSES>(
-    ALL_STATUSES,
-  );
+  // Filter state lives in the URL query string (not useState) so a search is
+  // shareable via link and the browser back/forward buttons work as expected.
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const airportInput = (searchParams.get("airport") ?? "").toUpperCase();
+  const direction = (searchParams.get("type") as FlightDirection | null) ?? "departures";
+  const selectedAirline = searchParams.get("airline") ?? ALL_AIRLINES;
+  const selectedStatus =
+    (searchParams.get("status") as FlightStatus | null) ?? ALL_STATUSES;
+
+  function updateParams(patch: Record<string, string | null>, options?: { push?: boolean }) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value === null || value === "") next.delete(key);
+          else next.set(key, value);
+        }
+        return next;
+      },
+      // Continuous typing uses `replace` so every keystroke doesn't spam
+      // browser history; discrete selections (dropdowns/buttons) `push` so
+      // the back button can undo one filter change at a time.
+      { replace: !options?.push },
+    );
+  }
+
+  const setAirportInput = (code: string) => updateParams({ airport: code || null });
+  const setDirection = (value: FlightDirection) =>
+    updateParams({ type: value === "departures" ? null : value }, { push: true });
+  const setSelectedAirline = (airline: string) =>
+    updateParams({ airline: airline === ALL_AIRLINES ? null : airline }, { push: true });
+  const setSelectedStatus = (status: string) =>
+    updateParams({ status: status === ALL_STATUSES ? null : status }, { push: true });
 
   const isValidAirport = IATA_CODE_PATTERN.test(airportInput);
   const { data, isLoading, isFetching, isError, error, refetch } = useFlights(
@@ -158,7 +188,7 @@ export default function Flights() {
           <select
             id="status"
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value as FlightStatus | typeof ALL_STATUSES)}
+            onChange={(e) => setSelectedStatus(e.target.value)}
             className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
           >
             <option value={ALL_STATUSES}>All Statuses</option>
@@ -206,7 +236,25 @@ export default function Flights() {
 
       {isValidAirport && isLoading && <FlightsTableSkeleton />}
 
-      {isValidAirport && isError && (
+      {isValidAirport && isError && error instanceof ApiError && error.status === 429 && (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 py-12 text-center dark:border-amber-900/40 dark:bg-amber-950/20">
+          <Clock className="size-8 text-amber-500" />
+          <div>
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              Flight data quota reached
+            </p>
+            <p className="mx-auto max-w-md px-4 text-sm text-amber-600/80 dark:text-amber-400/70">
+              We've hit our flight-data provider's rate limit. This usually resets soon —
+              please try again in a little while.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="size-3.5" /> Try again
+          </Button>
+        </div>
+      )}
+
+      {isValidAirport && isError && !(error instanceof ApiError && error.status === 429) && (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-red-200 bg-red-50 py-12 text-center dark:border-red-900/40 dark:bg-red-950/20">
           <AlertTriangle className="size-8 text-red-500" />
           <div>

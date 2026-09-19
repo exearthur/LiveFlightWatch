@@ -3,9 +3,14 @@ from typing import Any
 import httpx
 
 from app.models.flight import Airport, Flight, FlightStatus, FlightType
-from app.providers.base import FlightProvider, ProviderError
+from app.providers.base import FlightProvider, ProviderError, RateLimitError
 
 DELAY_THRESHOLD_MINUTES = 15
+
+# AviationStack's own codes for "you've used up your quota" / "too many
+# requests per minute" (the latter is unlikely on a free-tier key, but
+# cheap to handle the same way).
+_RATE_LIMIT_ERROR_CODES = {"usage_limit_reached", "rate_limit_reached"}
 
 _RAW_STATUS_MAP: dict[str, FlightStatus] = {
     "scheduled": "scheduled",
@@ -45,18 +50,32 @@ class AviationStackProvider(FlightProvider):
         except httpx.HTTPError as exc:
             raise ProviderError(f"Request to AviationStack failed: {exc}") from exc
 
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+
+        error_body = payload.get("error") if isinstance(payload, dict) else None
+        error_code = error_body.get("code") if isinstance(error_body, dict) else None
+
+        if response.status_code == 429 or error_code in _RATE_LIMIT_ERROR_CODES:
+            message = (
+                error_body.get("message")
+                if isinstance(error_body, dict)
+                else "AviationStack rate limit or monthly quota exceeded"
+            )
+            raise RateLimitError(message)
+
         if response.status_code != 200:
             raise ProviderError(
                 f"AviationStack returned status {response.status_code}: {response.text[:200]}"
             )
 
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            raise ProviderError("AviationStack returned a non-JSON response") from exc
+        if payload is None:
+            raise ProviderError("AviationStack returned a non-JSON response")
 
-        if "error" in payload:
-            raise ProviderError(f"AviationStack error: {payload['error']}")
+        if error_body is not None:
+            raise ProviderError(f"AviationStack error: {error_body}")
 
         raw_flights = payload.get("data")
         if raw_flights is None:

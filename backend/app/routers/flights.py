@@ -7,7 +7,7 @@ from app.config import get_settings
 from app.core.cache import TTLCache
 from app.models.flight import Flight, FlightsResponse, FlightType
 from app.providers.aviationstack import AviationStackProvider
-from app.providers.base import ProviderError
+from app.providers.base import ProviderError, RateLimitError
 from app.services.flight_service import FlightService
 
 router = APIRouter(prefix="/api", tags=["flights"])
@@ -32,5 +32,7 @@ async def get_flights(
     service = get_flight_service()
     try:
         return await service.get_flights(airport.upper(), flight_type)
+    except RateLimitError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except ProviderError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
