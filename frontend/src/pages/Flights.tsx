@@ -1,14 +1,31 @@
 import { AlertTriangle, PlaneTakeoff, RefreshCw, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FlightsTable } from "@/components/flights/FlightsTable";
 import { FlightsTableSkeleton } from "@/components/flights/FlightsTableSkeleton";
 import { useFlights } from "@/hooks/useFlights";
-import { ALL_AIRLINES, filterFlightsByAirline, getUniqueAirlines } from "@/lib/flightFilters";
-import type { FlightDirection } from "@/types/flight";
+import { useRecentAirports } from "@/hooks/useRecentAirports";
+import {
+  ALL_AIRLINES,
+  ALL_STATUSES,
+  filterFlightsByAirline,
+  filterFlightsByStatus,
+  getUniqueAirlines,
+} from "@/lib/flightFilters";
+import type { FlightDirection, FlightStatus } from "@/types/flight";
 
 const IATA_CODE_PATTERN = /^[A-Za-z]{3}$/;
+
+const FLIGHT_STATUSES: FlightStatus[] = [
+  "scheduled",
+  "active",
+  "landed",
+  "cancelled",
+  "diverted",
+  "delayed",
+  "unknown",
+];
 
 function timeAgo(iso: string): string {
   const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
@@ -21,23 +38,35 @@ export default function Flights() {
   const [airportInput, setAirportInput] = useState("");
   const [direction, setDirection] = useState<FlightDirection>("departures");
   const [selectedAirline, setSelectedAirline] = useState<string>(ALL_AIRLINES);
+  const [selectedStatus, setSelectedStatus] = useState<FlightStatus | typeof ALL_STATUSES>(
+    ALL_STATUSES,
+  );
 
   const isValidAirport = IATA_CODE_PATTERN.test(airportInput);
   const { data, isLoading, isFetching, isError, error, refetch } = useFlights(
     airportInput,
     direction,
   );
+  const { recentAirports, addRecentAirport } = useRecentAirports();
+
+  useEffect(() => {
+    if (isValidAirport && data && !isError) {
+      addRecentAirport(airportInput);
+    }
+  }, [isValidAirport, data, isError, airportInput, addRecentAirport]);
 
   const airlineOptions = useMemo(
     () => getUniqueAirlines(data?.flights ?? []),
     [data],
   );
-  const filteredFlights = useMemo(
-    () => filterFlightsByAirline(data?.flights ?? [], selectedAirline),
-    [data, selectedAirline],
-  );
+  const filteredFlights = useMemo(() => {
+    const byAirline = filterFlightsByAirline(data?.flights ?? [], selectedAirline);
+    return filterFlightsByStatus(byAirline, selectedStatus);
+  }, [data, selectedAirline, selectedStatus]);
   const isFilteredEmpty =
-    selectedAirline !== ALL_AIRLINES && !!data && filteredFlights.length === 0;
+    (selectedAirline !== ALL_AIRLINES || selectedStatus !== ALL_STATUSES) &&
+    !!data &&
+    filteredFlights.length === 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -72,6 +101,20 @@ export default function Flights() {
               className="w-36 rounded-md border border-neutral-300 bg-white py-2 pr-3 pl-9 font-mono uppercase text-neutral-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
             />
           </div>
+          {recentAirports.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {recentAirports.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setAirportInput(code)}
+                  className="rounded-full border border-neutral-300 px-2.5 py-1 font-mono text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">
@@ -103,6 +146,25 @@ export default function Flights() {
             {airlineOptions.map((airline) => (
               <option key={airline} value={airline}>
                 {airline}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="status" className="text-sm text-neutral-500 dark:text-neutral-400">
+            Status
+          </label>
+          <select
+            id="status"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value as FlightStatus | typeof ALL_STATUSES)}
+            className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+          >
+            <option value={ALL_STATUSES}>All Statuses</option>
+            {FLIGHT_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status.charAt(0).toUpperCase() + status.slice(1)}
               </option>
             ))}
           </select>
@@ -162,7 +224,7 @@ export default function Flights() {
       {isValidAirport && data && !isError && isFilteredEmpty && (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-300 py-16 text-center text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
           <PlaneTakeoff className="size-8 text-neutral-400 dark:text-neutral-600" />
-          <p>No flights found for this airline.</p>
+          <p>No flights match the selected filters.</p>
         </div>
       )}
 

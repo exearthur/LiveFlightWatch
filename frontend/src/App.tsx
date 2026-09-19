@@ -12,6 +12,7 @@ import {
   MobileNavToggle,
   MobileNavMenu,
 } from "./components/ui/resizable-navbar";
+import { ThemeToggle } from "./components/ThemeToggle";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Flights from "./pages/Flights";
@@ -32,11 +33,14 @@ function App() {
         <NavBody className="bg-neutral-950 px-6 py-3">
           <NavbarLogo />
           <NavItems items={navLinks} />
-          <Link to="/flights">
-            <NavbarButton as="span" variant="gradient" className="cursor-pointer">
-              Track a Flight
-            </NavbarButton>
-          </Link>
+          <div className="relative z-20 flex items-center gap-2">
+            <ThemeToggle />
+            <Link to="/flights">
+              <NavbarButton as="span" variant="gradient" className="cursor-pointer">
+                Track a Flight
+              </NavbarButton>
+            </Link>
+          </div>
         </NavBody>
 
         <MobileNav className="bg-neutral-950">
@@ -62,15 +66,18 @@ function App() {
                 {item.name}
               </Link>
             ))}
-            <Link
-              to="/flights"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="w-full"
-            >
-              <NavbarButton as="span" variant="gradient" className="w-full">
-                Track a Flight
-              </NavbarButton>
-            </Link>
+            <div className="flex w-full items-center gap-2">
+              <Link
+                to="/flights"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex-1"
+              >
+                <NavbarButton as="span" variant="gradient" className="w-full">
+                  Track a Flight
+                </NavbarButton>
+              </Link>
+              <ThemeToggle />
+            </div>
           </MobileNavMenu>
         </MobileNav>
       </Navbar>

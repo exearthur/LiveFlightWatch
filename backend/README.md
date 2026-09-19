@@ -28,3 +28,13 @@ Then visit `http://localhost:8000/docs` for interactive API docs, or try:
 ```
 http://localhost:8000/api/flights?airport=JFK&type=departures
 ```
+
+## Running tests
+
+```
+pip install -r requirements.txt
+pytest
+```
+
+Tests use fakes/mocks for the AviationStack provider and the flight service,
+so no real API key or network access is required to run them.

@@ -1,0 +1,91 @@
+from datetime import datetime, timezone
+
+from fastapi.testclient import TestClient
+
+import app.routers.flights as flights_router_module
+from app.main import app
+from app.models.flight import FlightsResponse
+from app.providers.base import ProviderError
+
+client = TestClient(app)
+
+
+class _FakeService:
+    """Stand-in for FlightService used to control what the router sees,
+    without making a real AviationStack call."""
+
+    def __init__(self, response=None, error: Exception | None = None):
+        self._response = response
+        self._error = error
+
+    async def get_flights(self, airport, flight_type):
+        if self._error is not None:
+            raise self._error
+        return self._response
+
+
+def test_invalid_airport_code_returns_422():
+    response = client.get("/api/flights", params={"airport": "TOOLONG", "type": "departures"})
+
+    assert response.status_code == 422
+
+
+def test_missing_airport_returns_422():
+    response = client.get("/api/flights")
+
+    assert response.status_code == 422
+
+
+def test_provider_error_is_mapped_to_502(monkeypatch):
+    fake_service = _FakeService(error=ProviderError("upstream failed"))
+    # get_flight_service() is called directly inside the handler (not via
+    # FastAPI's Depends()), so app.dependency_overrides won't intercept it.
+    # Patch the name in the flights router module instead.
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+
+    response = client.get("/api/flights", params={"airport": "JFK", "type": "departures"})
+
+    assert response.status_code == 502
+    assert "upstream failed" in response.json()["detail"]
+
+
+def test_valid_request_returns_flights_response(monkeypatch):
+    sample_response = FlightsResponse(
+        airport="JFK",
+        type="departures",
+        fetched_at=datetime.now(timezone.utc),
+        cached=False,
+        flights=[],
+    )
+    fake_service = _FakeService(response=sample_response)
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+
+    response = client.get("/api/flights", params={"airport": "jfk", "type": "departures"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["airport"] == "JFK"
+    assert body["type"] == "departures"
+    assert body["flights"] == []
+
+
+def test_flight_type_defaults_to_departures(monkeypatch):
+    seen: dict = {}
+
+    class RecordingService(_FakeService):
+        async def get_flights(self, airport, flight_type):
+            seen["flight_type"] = flight_type
+            return FlightsResponse(
+                airport=airport,
+                type=flight_type,
+                fetched_at=datetime.now(timezone.utc),
+                cached=False,
+                flights=[],
+            )
+
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: RecordingService())
+
+    response = client.get("/api/flights", params={"airport": "JFK"})
+
+    assert response.status_code == 200
+    assert seen["flight_type"] == "departures"

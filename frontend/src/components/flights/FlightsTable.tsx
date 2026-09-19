@@ -79,57 +79,115 @@ export function FlightsTable({ flights, direction }: FlightsTableProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-neutral-200 shadow-sm dark:border-neutral-800">
-      <div className="max-h-[70vh] overflow-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
-            <tr>
-              <th className="px-4 py-3 font-medium">Flight</th>
-              <th className="px-4 py-3 font-medium">Airline</th>
-              <th className="px-4 py-3 font-medium">
-                {direction === "departures" ? "Destination" : "Origin"}
-              </th>
-              <th className="px-4 py-3 font-medium">Scheduled</th>
-              <th className="px-4 py-3 font-medium">Estimated</th>
-              <th className="px-4 py-3 font-medium">Terminal / Gate</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
-            {flights.map((flight, idx) => {
-              const other = direction === "departures" ? flight.destination : flight.origin;
-              return (
-                <tr
-                  key={`${flight.flight_number}-${idx}`}
-                  className="odd:bg-white even:bg-neutral-50/60 hover:bg-sky-50 dark:odd:bg-neutral-950 dark:even:bg-neutral-900/40 dark:hover:bg-sky-950/30"
-                >
-                  <td className="px-4 py-3 font-medium text-neutral-900 dark:text-neutral-100">
-                    {flight.flight_number}
-                  </td>
-                  <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                    {flight.airline ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                    {other.name ?? (other.iata || "—")}
-                  </td>
-                  <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                    {formatTime(flight.scheduled_time)}
-                  </td>
-                  <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                    {formatTime(flight.estimated_time)}
-                  </td>
-                  <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                    {[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={flight.status} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    <>
+      <div className="hidden overflow-hidden rounded-xl border border-neutral-200 shadow-sm md:block dark:border-neutral-800">
+        <div className="max-h-[70vh] overflow-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
+              <tr>
+                <th className="px-4 py-3 font-medium">Flight</th>
+                <th className="px-4 py-3 font-medium">Airline</th>
+                <th className="px-4 py-3 font-medium">
+                  {direction === "departures" ? "Destination" : "Origin"}
+                </th>
+                <th className="px-4 py-3 font-medium">Scheduled</th>
+                <th className="px-4 py-3 font-medium">Estimated</th>
+                <th className="px-4 py-3 font-medium">Terminal / Gate</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
+              {flights.map((flight, idx) => {
+                const other = direction === "departures" ? flight.destination : flight.origin;
+                return (
+                  <tr
+                    key={`${flight.flight_number}-${idx}`}
+                    className="odd:bg-white even:bg-neutral-50/60 hover:bg-sky-50 dark:odd:bg-neutral-950 dark:even:bg-neutral-900/40 dark:hover:bg-sky-950/30"
+                  >
+                    <td className="px-4 py-3 font-medium text-neutral-900 dark:text-neutral-100">
+                      {flight.flight_number}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
+                      {flight.airline ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
+                      {other.name ?? (other.iata || "—")}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
+                      {formatTime(flight.scheduled_time)}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
+                      {formatTime(flight.estimated_time)}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
+                      {[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={flight.status} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      <div className="max-h-[70vh] space-y-3 overflow-auto md:hidden">
+        {flights.map((flight, idx) => {
+          const other = direction === "departures" ? flight.destination : flight.origin;
+          return (
+            <div
+              key={`${flight.flight_number}-${idx}`}
+              className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                    {flight.flight_number}
+                  </p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                    {flight.airline ?? "—"}
+                  </p>
+                </div>
+                <StatusBadge status={flight.status} />
+              </div>
+
+              <div className="mt-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                  {direction === "departures" ? "Destination" : "Origin"}
+                </p>
+                <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                  {other.name ?? (other.iata || "—")}
+                </p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+                <div>
+                  <p className="text-xs text-neutral-400 dark:text-neutral-500">Scheduled</p>
+                  <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                    {formatTime(flight.scheduled_time)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-400 dark:text-neutral-500">Estimated</p>
+                  <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                    {formatTime(flight.estimated_time)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                    Terminal / Gate
+                  </p>
+                  <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                    {[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
