@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 import app.routers.flights as flights_router_module
 from app.main import app
 from app.models.flight import FlightsResponse
-from app.providers.base import ProviderError
+from app.providers.base import ProviderError, RateLimitError
 
 client = TestClient(app)
 
@@ -47,6 +47,16 @@ def test_provider_error_is_mapped_to_502(monkeypatch):
 
     assert response.status_code == 502
     assert "upstream failed" in response.json()["detail"]
+
+
+def test_rate_limit_error_is_mapped_to_429(monkeypatch):
+    fake_service = _FakeService(error=RateLimitError("monthly quota exceeded"))
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+
+    response = client.get("/api/flights", params={"airport": "JFK", "type": "departures"})
+
+    assert response.status_code == 429
+    assert "monthly quota exceeded" in response.json()["detail"]
 
 
 def test_valid_request_returns_flights_response(monkeypatch):
