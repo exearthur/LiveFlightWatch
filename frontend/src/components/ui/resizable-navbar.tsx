@@ -1,6 +1,8 @@
 "use client";
 import { cn } from "../../lib/utils";
 import { IconMenu2, IconX } from "@tabler/icons-react";
+import { Plane } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   motion,
   AnimatePresence,
@@ -125,21 +127,21 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
       )}
     >
       {items.map((item, idx) => (
-        <a
+        <Link
           onMouseEnter={() => setHovered(idx)}
           onClick={onItemClick}
-          className="relative px-4 py-2 text-neutral-600 dark:text-neutral-300"
+          className="relative px-4 py-2 text-neutral-300 transition-colors hover:text-white"
           key={`link-${idx}`}
-          href={item.link}
+          to={item.link}
         >
           {hovered === idx && (
             <motion.div
               layoutId="hovered"
-              className="absolute inset-0 h-full w-full rounded-full bg-gray-100 dark:bg-neutral-800"
+              className="absolute inset-0 h-full w-full rounded-full bg-white/10"
             />
           )}
           <span className="relative z-20">{item.name}</span>
-        </a>
+        </Link>
       ))}
     </motion.div>
   );
@@ -195,7 +197,7 @@ export const MobileNavMenu = ({
   children,
   className,
   isOpen,
-  onClose,
+  onClose: _onClose,
 }: MobileNavMenuProps) => {
   return (
     <AnimatePresence>
@@ -224,26 +226,32 @@ export const MobileNavToggle = ({
   onClick: () => void;
 }) => {
   return isOpen ? (
-    <IconX className="text-black dark:text-white" onClick={onClick} />
+    <IconX className="text-white" onClick={onClick} />
   ) : (
-    <IconMenu2 className="text-black dark:text-white" onClick={onClick} />
+    <IconMenu2 className="text-white" onClick={onClick} />
   );
 };
 
 export const NavbarLogo = () => {
   return (
-    <a
-      href="#"
-      className="relative z-20 -ml-2 flex items-center space-x-2 px-2 py-1 text-xl font-normal text-black"
+    <Link
+      to="/"
+      className="relative z-20 -ml-2 flex items-center gap-2.5 px-2 py-1"
     >
-      <img
-        src="https://assets.aceternity.com/logo-dark.png"
-        alt="logo"
-        width={30}
-        height={30}
-      />
-      <span className="font-medium text-black dark:text-white">Live Flight Watch</span>
-    </a>
+      <span className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-sky-600 shadow-[0_0_16px_rgba(56,189,248,0.5)]">
+        <Plane className="size-4 -rotate-45 text-white" strokeWidth={2.5} />
+      </span>
+      <span className="text-lg font-semibold tracking-tight text-white">
+        Live Flight Watch
+      </span>
+      <span className="ml-1 hidden items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 sm:flex dark:text-emerald-400">
+        <span className="relative flex size-1.5">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+          <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+        </span>
+        LIVE
+      </span>
+    </Link>
   );
 };
 
