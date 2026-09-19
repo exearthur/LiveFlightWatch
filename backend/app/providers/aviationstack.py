@@ -44,6 +44,21 @@ class AviationStackProvider(FlightProvider):
         else:
             params["arr_iata"] = airport
 
+        raw_flights = await self._fetch(params)
+        return [self._to_flight(raw, flight_type) for raw in raw_flights]
+
+    async def get_flight_by_number(self, flight_number: str) -> list[Flight]:
+        params = {"access_key": self._api_key, "flight_iata": flight_number}
+
+        raw_flights = await self._fetch(params)
+        # A flight-number lookup isn't tied to a departures/arrivals leg the
+        # way an airport search is, but Flight only has one set of
+        # terminal/gate/status fields, so we normalize using the departure
+        # leg (matches AviationStack's own default framing for flight_iata
+        # lookups).
+        return [self._to_flight(raw, "departures") for raw in raw_flights]
+
+    async def _fetch(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(self._base_url, params=params)
@@ -81,7 +96,7 @@ class AviationStackProvider(FlightProvider):
         if raw_flights is None:
             raise ProviderError("AviationStack response missing 'data' field")
 
-        return [self._to_flight(raw, flight_type) for raw in raw_flights]
+        return raw_flights
 
     def _to_flight(self, raw: dict[str, Any], flight_type: FlightType) -> Flight:
         departure = raw.get("departure") or {}

@@ -59,19 +59,26 @@ function StatusBadge({ status }: { status: FlightStatus }) {
 interface FlightsTableProps {
   flights: Flight[];
   direction: "departures" | "arrivals";
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
-export function FlightsTable({ flights, direction }: FlightsTableProps) {
+export function FlightsTable({
+  flights,
+  direction,
+  emptyTitle,
+  emptyDescription,
+}: FlightsTableProps) {
   if (flights.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-300 py-16 text-center dark:border-neutral-700">
         <Plane className="size-8 -rotate-45 text-neutral-400 dark:text-neutral-600" />
         <div>
           <p className="font-medium text-neutral-700 dark:text-neutral-300">
-            No {direction} found
+            {emptyTitle ?? `No ${direction} found`}
           </p>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Try a different airport code or switch direction.
+            {emptyDescription ?? "Try a different airport code or switch direction."}
           </p>
         </div>
       </div>

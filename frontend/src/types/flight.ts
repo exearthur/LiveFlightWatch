@@ -34,3 +34,10 @@ export interface FlightsResponse {
   cached: boolean;
   flights: Flight[];
 }
+
+export interface FlightLookupResponse {
+  flight_number: string;
+  fetched_at: string;
+  cached: boolean;
+  flights: Flight[];
+}

@@ -13,9 +13,14 @@ class FakeProvider(FlightProvider):
     def __init__(self, flights: list[Flight]):
         self._flights = flights
         self.call_count = 0
+        self.lookup_call_count = 0
 
     async def get_flights(self, airport: str, flight_type: FlightType) -> list[Flight]:
         self.call_count += 1
+        return self._flights
+
+    async def get_flight_by_number(self, flight_number: str) -> list[Flight]:
+        self.lookup_call_count += 1
         return self._flights
 
 
@@ -83,3 +88,56 @@ def test_expired_cache_entry_triggers_another_provider_call():
 
     assert response.cached is False
     assert provider.call_count == 2
+
+
+# --- get_flight_by_number() -------------------------------------------------
+
+
+def test_lookup_first_call_is_a_cache_miss_and_hits_the_provider():
+    provider = FakeProvider([_make_flight("DL2042")])
+    cache: TTLCache[list[Flight]] = TTLCache(ttl_seconds=60)
+    service = FlightService(provider=provider, cache=cache)
+
+    response = asyncio.run(service.get_flight_by_number("DL2042"))
+
+    assert response.cached is False
+    assert response.flight_number == "DL2042"
+    assert provider.lookup_call_count == 1
+    assert len(response.flights) == 1
+
+
+def test_lookup_second_call_within_ttl_is_served_from_cache():
+    provider = FakeProvider([_make_flight("DL2042")])
+    cache: TTLCache[list[Flight]] = TTLCache(ttl_seconds=60)
+    service = FlightService(provider=provider, cache=cache)
+
+    first = asyncio.run(service.get_flight_by_number("DL2042"))
+    second = asyncio.run(service.get_flight_by_number("DL2042"))
+
+    assert first.cached is False
+    assert second.cached is True
+    assert provider.lookup_call_count == 1
+    assert second.flights == first.flights
+
+
+def test_lookup_and_airport_search_use_independent_cache_keys():
+    provider = FakeProvider([_make_flight("DL2042")])
+    cache: TTLCache[list[Flight]] = TTLCache(ttl_seconds=60)
+    service = FlightService(provider=provider, cache=cache)
+
+    asyncio.run(service.get_flights("JFK", "departures"))
+    asyncio.run(service.get_flight_by_number("DL2042"))
+
+    assert provider.call_count == 1
+    assert provider.lookup_call_count == 1
+
+
+def test_lookup_with_no_matching_flights_returns_empty_list_not_error():
+    provider = FakeProvider([])
+    cache: TTLCache[list[Flight]] = TTLCache(ttl_seconds=60)
+    service = FlightService(provider=provider, cache=cache)
+
+    response = asyncio.run(service.get_flight_by_number("ZZ9999"))
+
+    assert response.cached is False
+    assert response.flights == []

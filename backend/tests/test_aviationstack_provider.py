@@ -1,6 +1,31 @@
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from app.providers.aviationstack import AviationStackProvider, _clean
+from app.providers.base import ProviderError
 
 PROVIDER = AviationStackProvider(api_key="test-key", base_url="https://example.invalid")
+
+
+def _mock_http_response(status_code: int = 200, json_data=None, text: str = ""):
+    response = MagicMock()
+    response.status_code = status_code
+    response.json.return_value = {} if json_data is None else json_data
+    response.text = text
+    return response
+
+
+def _mock_async_client(response):
+    """Builds a mock standing in for `httpx.AsyncClient(...)` used as an
+    `async with ... as client:` context manager, with `client.get(...)`
+    resolving to `response`."""
+    client = MagicMock()
+    client.get = AsyncMock(return_value=response)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
 
 
 def _raw_flight(**overrides):
@@ -190,3 +215,79 @@ def test_flight_number_falls_back_to_unknown_when_both_placeholders():
     flight = PROVIDER._to_flight(raw, "departures")
 
     assert flight.flight_number == "Unknown"
+
+
+# --- get_flight_by_number() -------------------------------------------------
+
+
+@patch("app.providers.aviationstack.httpx.AsyncClient")
+def test_get_flight_by_number_queries_flight_iata_and_normalizes_result(mock_client_cls):
+    response = _mock_http_response(json_data={"data": [_raw_flight()]})
+    client = _mock_async_client(response)
+    mock_client_cls.return_value = client
+
+    flights = asyncio.run(PROVIDER.get_flight_by_number("DL123"))
+
+    assert len(flights) == 1
+    assert flights[0].flight_number == "DL123"
+    assert flights[0].origin.iata == "JFK"
+    assert flights[0].destination.iata == "LAX"
+
+    _, call_kwargs = client.get.call_args
+    assert call_kwargs["params"]["flight_iata"] == "DL123"
+    assert call_kwargs["params"]["access_key"] == "test-key"
+    # a flight-number lookup has no direction, so it must not send dep/arr params
+    assert "dep_iata" not in call_kwargs["params"]
+    assert "arr_iata" not in call_kwargs["params"]
+
+
+@patch("app.providers.aviationstack.httpx.AsyncClient")
+def test_get_flight_by_number_with_no_matches_returns_empty_list(mock_client_cls):
+    response = _mock_http_response(json_data={"data": []})
+    mock_client_cls.return_value = _mock_async_client(response)
+
+    flights = asyncio.run(PROVIDER.get_flight_by_number("ZZ9999"))
+
+    assert flights == []
+
+
+@patch("app.providers.aviationstack.httpx.AsyncClient")
+def test_get_flight_by_number_raises_provider_error_on_non_200(mock_client_cls):
+    response = _mock_http_response(status_code=500, text="server error")
+    mock_client_cls.return_value = _mock_async_client(response)
+
+    with pytest.raises(ProviderError):
+        asyncio.run(PROVIDER.get_flight_by_number("DL123"))
+
+
+@patch("app.providers.aviationstack.httpx.AsyncClient")
+def test_get_flight_by_number_raises_provider_error_on_api_error_payload(mock_client_cls):
+    response = _mock_http_response(json_data={"error": {"info": "invalid access_key"}})
+    mock_client_cls.return_value = _mock_async_client(response)
+
+    with pytest.raises(ProviderError):
+        asyncio.run(PROVIDER.get_flight_by_number("DL123"))
+
+
+@patch("app.providers.aviationstack.httpx.AsyncClient")
+def test_get_flight_by_number_raises_provider_error_when_data_field_missing(mock_client_cls):
+    response = _mock_http_response(json_data={"pagination": {}})
+    mock_client_cls.return_value = _mock_async_client(response)
+
+    with pytest.raises(ProviderError):
+        asyncio.run(PROVIDER.get_flight_by_number("DL123"))
+
+
+@patch("app.providers.aviationstack.httpx.AsyncClient")
+def test_get_flights_still_sends_dep_iata_for_departures(mock_client_cls):
+    """Guards the _fetch() extraction: get_flights() must keep its own
+    dep_iata/arr_iata params and not regress into a flight_iata lookup."""
+    response = _mock_http_response(json_data={"data": [_raw_flight()]})
+    client = _mock_async_client(response)
+    mock_client_cls.return_value = client
+
+    asyncio.run(PROVIDER.get_flights("JFK", "departures"))
+
+    _, call_kwargs = client.get.call_args
+    assert call_kwargs["params"]["dep_iata"] == "JFK"
+    assert "flight_iata" not in call_kwargs["params"]

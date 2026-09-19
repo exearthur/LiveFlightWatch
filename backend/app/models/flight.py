@@ -34,3 +34,15 @@ class FlightsResponse(BaseModel):
     fetched_at: datetime
     cached: bool
     flights: list[Flight]
+
+
+class FlightLookupResponse(BaseModel):
+    """Response shape for a direct flight-number lookup (as opposed to an
+    airport departures/arrivals search). Mirrors FlightsResponse but keyed
+    by flight number instead of airport/type, since a lookup isn't tied to
+    either."""
+
+    flight_number: str
+    fetched_at: datetime
+    cached: bool
+    flights: list[Flight]
