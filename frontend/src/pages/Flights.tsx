@@ -1,10 +1,11 @@
-import { AlertTriangle, Clock, PlaneTakeoff, RefreshCw, Search } from "lucide-react";
+import { AlertTriangle, Clock, PlaneTakeoff, RefreshCw, Search, Star } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { FlightsTable } from "@/components/flights/FlightsTable";
 import { FlightsTableSkeleton } from "@/components/flights/FlightsTableSkeleton";
+import { useFavorites } from "@/hooks/useFavorites";
 import { useFlights } from "@/hooks/useFlights";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
 import { ApiError } from "@/lib/api";
@@ -78,6 +79,26 @@ export default function Flights() {
     direction,
   );
   const { recentAirports, addRecentAirport } = useRecentAirports();
+  const { addFavorite, removeFavorite, isFavorite } = useFavorites();
+
+  const currentFavorite = isValidAirport
+    ? {
+        airport: airportInput,
+        direction,
+        airline: selectedAirline,
+        status: selectedStatus,
+      }
+    : null;
+  const currentIsFavorite = currentFavorite ? isFavorite(currentFavorite) : false;
+
+  const handleToggleFavorite = () => {
+    if (!currentFavorite) return;
+    if (currentIsFavorite) {
+      removeFavorite(currentFavorite);
+    } else {
+      addFavorite(currentFavorite);
+    }
+  };
 
   useEffect(() => {
     if (isValidAirport && data && !isError) {
@@ -209,6 +230,18 @@ export default function Flights() {
               flights · updated {timeAgo(data.fetched_at)}
               {data.cached && " (cached)"}
             </span>
+            <button
+              onClick={handleToggleFavorite}
+              aria-label={currentIsFavorite ? "Remove from favorites" : "Save as favorite"}
+              aria-pressed={currentIsFavorite}
+              className="rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >
+              <Star
+                className={`size-3.5 ${
+                  currentIsFavorite ? "fill-sky-500 text-sky-500" : ""
+                }`}
+              />
+            </button>
             <button
               onClick={() => refetch()}
               disabled={isFetching}
