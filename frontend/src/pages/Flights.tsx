@@ -1,13 +1,24 @@
-import { AlertTriangle, Clock, Hash, PlaneTakeoff, RefreshCw, Search, Star } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import {
+  AlertTriangle,
+  Clock,
+  Hash,
+  LocateFixed,
+  PlaneTakeoff,
+  RefreshCw,
+  Search,
+  Star,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { FlightsTable } from "@/components/flights/FlightsTable";
 import { FlightsTableSkeleton } from "@/components/flights/FlightsTableSkeleton";
+import { getAirportByIata } from "@/data/airports";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useFlightLookup } from "@/hooks/useFlightLookup";
 import { useFlights } from "@/hooks/useFlights";
+import { useNearestAirport } from "@/hooks/useNearestAirport";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
 import { ApiError } from "@/lib/api";
 import {
@@ -86,10 +97,39 @@ export default function Flights() {
   const isValidAirport = IATA_CODE_PATTERN.test(airportInput);
   const isValidFlightNumber = FLIGHT_NUMBER_PATTERN.test(flightNumberInput);
 
+  // Only attempt location-based detection once, on the initial load of the
+  // "by airport" search with nothing already selected — not every time the
+  // input happens to become empty again (e.g. the user clearing it by hand).
+  const [autoDetectOnLoad] = useState(() => mode === "airport" && !airportInput);
+  const nearestAirport = useNearestAirport({ enabled: autoDetectOnLoad });
+  const matchedAirport = isValidAirport ? getAirportByIata(airportInput) : undefined;
+
+  // Auto-load path: react to the hook's state once the on-mount lookup
+  // resolves, but don't clobber a code the user already typed while we were
+  // waiting on the browser's location prompt.
+  useEffect(() => {
+    if (nearestAirport.status !== "found" || !nearestAirport.airport) return;
+    if (searchParams.get("airport")) return;
+    setAirportInput(nearestAirport.airport.iata);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearestAirport.status, nearestAirport.airport]);
+
+  // Manual "Use my location" path: apply the lookup's own resolved result
+  // directly (always overwriting, since it's an explicit user action) rather
+  // than reacting to hook state — two consecutive lookups can resolve to the
+  // identical airport, which wouldn't trigger the effect above again.
+  const locateFromButton = async () => {
+    const result = await nearestAirport.locate();
+    if (result.status === "found" && result.airport) {
+      setAirportInput(result.airport.iata);
+    }
+  };
+
   const { data, isLoading, isFetching, isError, error, refetch } = useFlights(
     airportInput,
     direction,
   );
+  const hasLoadedAirport = isValidAirport && !!data;
   const {
     data: lookupData,
     isLoading: isLookupLoading,
@@ -103,11 +143,11 @@ export default function Flights() {
 
   const currentFavorite = isValidAirport
     ? {
-        airport: airportInput,
-        direction,
-        airline: selectedAirline,
-        status: selectedStatus,
-      }
+      airport: airportInput,
+      direction,
+      airline: selectedAirline,
+      status: selectedStatus,
+    }
     : null;
   const currentIsFavorite = currentFavorite ? isFavorite(currentFavorite) : false;
 
@@ -170,6 +210,49 @@ export default function Flights() {
         </Button>
       </div>
 
+      {mode === "airport" && nearestAirport.status !== "idle" && (
+        <div className="mb-4" aria-live="polite">
+          {nearestAirport.status === "locating" && (
+            <p className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+              <LocateFixed className="size-4 animate-pulse" />
+              Finding the nearest airport to your location…
+            </p>
+          )}
+          {nearestAirport.status === "found" &&
+            nearestAirport.airport &&
+            airportInput === nearestAirport.airport.iata && (
+              <p className="flex items-center gap-2 text-sm text-sky-700 dark:text-sky-400">
+                <LocateFixed className="size-4" />
+                Showing flights for {nearestAirport.airport.name} ({nearestAirport.airport.iata})
+                — the nearest supported airport to your location, about{" "}
+                {Math.round(nearestAirport.distanceKm ?? 0)} km away.
+              </p>
+            )}
+          {nearestAirport.status === "denied" && !hasLoadedAirport && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Location access was denied — enter an airport code below to see live flights.
+            </p>
+          )}
+          {nearestAirport.status === "unavailable" && !hasLoadedAirport && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Couldn't determine your location — enter an airport code below to see live
+              flights.
+            </p>
+          )}
+          {nearestAirport.status === "unsupported" && !hasLoadedAirport && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Location detection isn't available in this browser — enter an airport code
+              below.
+            </p>
+          )}
+          {nearestAirport.status === "out-of-range" && !hasLoadedAirport && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              We couldn't find a supported airport near your location — enter one below.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mb-6 flex flex-wrap items-end gap-4 rounded-xl border border-neutral-200 bg-neutral-50/50 p-4 dark:border-neutral-800 dark:bg-neutral-900/40">
         {mode === "airport" && (
           <>
@@ -189,6 +272,20 @@ export default function Flights() {
                   className="w-36 rounded-md border border-neutral-300 bg-white py-2 pr-3 pl-9 font-mono uppercase text-neutral-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
                 />
               </div>
+              {matchedAirport && (
+                <p className="pt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  {matchedAirport.name} · {matchedAirport.city}, {matchedAirport.country}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={locateFromButton}
+                disabled={nearestAirport.status === "locating"}
+                className="flex w-fit items-center gap-1 pt-1 text-xs text-sky-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-400"
+              >
+                <LocateFixed className="size-3" />
+                Use my location
+              </button>
               {recentAirports.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                   {recentAirports.map((code) => (
@@ -274,9 +371,8 @@ export default function Flights() {
                   className="rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                 >
                   <Star
-                    className={`size-3.5 ${
-                      currentIsFavorite ? "fill-sky-500 text-sky-500" : ""
-                    }`}
+                    className={`size-3.5 ${currentIsFavorite ? "fill-sky-500 text-sky-500" : ""
+                      }`}
                   />
                 </button>
                 <button

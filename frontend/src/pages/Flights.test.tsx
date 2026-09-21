@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -134,4 +134,142 @@ describe("Flights page", () => {
     },
     10_000,
   );
+});
+
+describe("Flights page — nearest-airport detection", () => {
+  beforeEach(() => {
+    mockedGetFlights.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    // @ts-expect-error -- cleaning up the mocked geolocation between tests
+    delete navigator.geolocation;
+    vi.restoreAllMocks();
+  });
+
+  function mockGeolocationSuccess(lat: number, lon: number, options?: { delayMs?: number }) {
+    const respond = (onSuccess: PositionCallback) => {
+      const position: GeolocationPosition = {
+        coords: {
+          latitude: lat,
+          longitude: lon,
+          accuracy: 10,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+          toJSON() {
+            return this;
+          },
+        },
+        timestamp: Date.now(),
+        toJSON() {
+          return this;
+        },
+      };
+      if (options?.delayMs) {
+        setTimeout(() => onSuccess(position), options.delayMs);
+      } else {
+        onSuccess(position);
+      }
+    };
+
+    Object.defineProperty(navigator, "geolocation", {
+      value: { getCurrentPosition: vi.fn(respond) },
+      configurable: true,
+    });
+  }
+
+  function mockGeolocationDenied() {
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition: vi.fn((_onSuccess: PositionCallback, onError?: PositionErrorCallback) =>
+          onError?.({
+            code: 1,
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+            message: "User denied geolocation",
+          }),
+        ),
+      },
+      configurable: true,
+    });
+  }
+
+  it("auto-loads the nearest supported airport's flights on load when location is granted", async () => {
+    mockGeolocationSuccess(40.7, -73.9); // near New York -> JFK
+    mockedGetFlights.mockResolvedValue(jfkDepartures);
+
+    renderFlights();
+
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenCalledWith("JFK", "departures"));
+    expect(
+      screen.getByText(/Showing flights for John F\. Kennedy International \(JFK\)/),
+    ).toBeInTheDocument();
+    expect((screen.getByLabelText("Airport code (IATA)") as HTMLInputElement).value).toBe("JFK");
+  });
+
+  it("falls back to manual search without blocking it when location access is denied", async () => {
+    mockGeolocationDenied();
+
+    renderFlights();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Location access was denied — enter an airport code below/),
+      ).toBeInTheDocument(),
+    );
+    expect(mockedGetFlights).not.toHaveBeenCalled();
+
+    mockedGetFlights.mockResolvedValue(jfkDepartures);
+    setAirportInput("jfk");
+
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenCalledWith("JFK", "departures"));
+  });
+
+  it("does not override a manually-entered airport once a delayed geolocation result resolves", async () => {
+    // Resolves to JFK, but only after the user has already typed something else.
+    mockGeolocationSuccess(40.7, -73.9, { delayMs: 20 });
+    mockedGetFlights.mockResolvedValue({ ...jfkDepartures, airport: "LAX" });
+
+    renderFlights();
+    setAirportInput("lax");
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenCalledWith("LAX", "departures"));
+
+    // Let the delayed geolocation callback fire; it must not clobber "LAX".
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+
+    expect((screen.getByLabelText("Airport code (IATA)") as HTMLInputElement).value).toBe("LAX");
+  });
+
+  it("re-applies the nearest airport when 'Use my location' is clicked after switching airports manually", async () => {
+    mockGeolocationSuccess(33.6407, -84.4277); // Atlanta -> ATL
+    mockedGetFlights.mockResolvedValue({ ...jfkDepartures, airport: "ATL" });
+
+    renderFlights();
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenCalledWith("ATL", "departures"));
+    expect((screen.getByLabelText("Airport code (IATA)") as HTMLInputElement).value).toBe("ATL");
+
+    // Manually switch away to JFK.
+    mockedGetFlights.mockResolvedValue(jfkDepartures);
+    setAirportInput("jfk");
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenCalledWith("JFK", "departures"));
+
+    // Clicking "Use my location" again should go back to ATL, not stay on JFK.
+    mockedGetFlights.mockResolvedValue({ ...jfkDepartures, airport: "ATL" });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Use my location" }));
+
+    await waitFor(() =>
+      expect((screen.getByLabelText("Airport code (IATA)") as HTMLInputElement).value).toBe(
+        "ATL",
+      ),
+    );
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenLastCalledWith("ATL", "departures"));
+  });
 });
