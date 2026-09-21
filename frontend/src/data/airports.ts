@@ -94,3 +94,18 @@ export function getAirportByIata(iata: string): SupportedAirport | undefined {
   const normalized = iata.trim().toUpperCase();
   return SUPPORTED_AIRPORTS.find((airport) => airport.iata === normalized);
 }
+
+// Metro areas served by multiple airports usually have only one entry in
+// SUPPORTED_AIRPORTS (it's a curated list of nearest-airport candidates, not
+// an exhaustive database — adding every secondary airport would also shift
+// which one nearest-airport detection picks for that region, which is a
+// separate concern from just knowing a city name). This fills in city names
+// for the others so destination search by city can still find them.
+const ADDITIONAL_CITIES_BY_IATA: Record<string, string> = {
+  LGA: "New York",
+};
+
+export function getCityByIata(iata: string): string | undefined {
+  const normalized = iata.trim().toUpperCase();
+  return getAirportByIata(normalized)?.city ?? ADDITIONAL_CITIES_BY_IATA[normalized];
+}
