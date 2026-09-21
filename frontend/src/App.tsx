@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Star } from "lucide-react";
 import { Link, Route, Routes } from "react-router-dom";
 
 import {
@@ -15,11 +16,11 @@ import {
 import { ThemeToggle } from "./components/ThemeToggle";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import Favorites from "./pages/Favorites";
 import Flights from "./pages/Flights";
-import Home from "./pages/Home";
 
 const navLinks = [
-  { name: "Home", link: "/" },
+  { name: "Flights", link: "/" },
   { name: "About", link: "/about" },
   { name: "Contact", link: "/contact" },
 ];
@@ -35,9 +36,14 @@ function App() {
           <NavItems items={navLinks} />
           <div className="relative z-20 flex items-center gap-2">
             <ThemeToggle />
-            <Link to="/flights">
-              <NavbarButton as="span" variant="gradient" className="cursor-pointer">
-                Track a Flight
+            <Link to="/favorites">
+              <NavbarButton
+                as="span"
+                variant="dark"
+                className="inline-flex cursor-pointer items-center gap-1.5"
+              >
+                <Star className="size-3.5" />
+                Favorites
               </NavbarButton>
             </Link>
           </div>
@@ -68,12 +74,17 @@ function App() {
             ))}
             <div className="flex w-full items-center gap-2">
               <Link
-                to="/flights"
+                to="/favorites"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="flex-1"
               >
-                <NavbarButton as="span" variant="gradient" className="w-full">
-                  Track a Flight
+                <NavbarButton
+                  as="span"
+                  variant="dark"
+                  className="inline-flex w-full items-center justify-center gap-1.5"
+                >
+                  <Star className="size-3.5" />
+                  Favorites
                 </NavbarButton>
               </Link>
               <ThemeToggle />
@@ -83,8 +94,9 @@ function App() {
       </Navbar>
 
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Flights />} />
         <Route path="/flights" element={<Flights />} />
+        <Route path="/favorites" element={<Favorites />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
       </Routes>
