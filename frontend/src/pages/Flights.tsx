@@ -25,6 +25,7 @@ import {
   ALL_AIRLINES,
   ALL_STATUSES,
   filterFlightsByAirline,
+  filterFlightsByDestination,
   filterFlightsByStatus,
   getUniqueAirlines,
 } from "@/lib/flightFilters";
@@ -63,6 +64,7 @@ export default function Flights() {
   const selectedAirline = searchParams.get("airline") ?? ALL_AIRLINES;
   const selectedStatus =
     (searchParams.get("status") as FlightStatus | null) ?? ALL_STATUSES;
+  const destinationInput = searchParams.get("destination") ?? "";
   const flightNumberInput = (searchParams.get("flight") ?? "").toUpperCase();
 
   function updateParams(patch: Record<string, string | null>, options?: { push?: boolean }) {
@@ -91,6 +93,7 @@ export default function Flights() {
     updateParams({ airline: airline === ALL_AIRLINES ? null : airline }, { push: true });
   const setSelectedStatus = (status: string) =>
     updateParams({ status: status === ALL_STATUSES ? null : status }, { push: true });
+  const setDestinationInput = (value: string) => updateParams({ destination: value || null });
   const setFlightNumberInput = (value: string) =>
     updateParams({ flight: value.toUpperCase() || null });
 
@@ -170,12 +173,16 @@ export default function Flights() {
     () => getUniqueAirlines(data?.flights ?? []),
     [data],
   );
+  const isDestinationFilterActive = direction === "departures" && destinationInput.trim() !== "";
   const filteredFlights = useMemo(() => {
-    const byAirline = filterFlightsByAirline(data?.flights ?? [], selectedAirline);
+    const byDestination = isDestinationFilterActive
+      ? filterFlightsByDestination(data?.flights ?? [], destinationInput)
+      : (data?.flights ?? []);
+    const byAirline = filterFlightsByAirline(byDestination, selectedAirline);
     return filterFlightsByStatus(byAirline, selectedStatus);
-  }, [data, selectedAirline, selectedStatus]);
+  }, [data, isDestinationFilterActive, destinationInput, selectedAirline, selectedStatus]);
   const isFilteredEmpty =
-    (selectedAirline !== ALL_AIRLINES || selectedStatus !== ALL_STATUSES) &&
+    (selectedAirline !== ALL_AIRLINES || selectedStatus !== ALL_STATUSES || isDestinationFilterActive) &&
     !!data &&
     filteredFlights.length === 0;
 
@@ -316,6 +323,28 @@ export default function Flights() {
                 Arrivals
               </Button>
             </div>
+
+            {direction === "departures" && (
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="destination"
+                  className="text-sm text-neutral-500 dark:text-neutral-400"
+                >
+                  Destination
+                </label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    id="destination"
+                    type="text"
+                    placeholder="e.g. LAX or Los Angeles"
+                    value={destinationInput}
+                    onChange={(e) => setDestinationInput(e.target.value)}
+                    className="w-48 rounded-md border border-neutral-300 bg-white py-2 pr-3 pl-9 text-neutral-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1">
               <label htmlFor="airline" className="text-sm text-neutral-500 dark:text-neutral-400">

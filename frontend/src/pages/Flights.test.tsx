@@ -63,6 +63,25 @@ const jfkDepartures: FlightsResponse = {
   ],
 };
 
+const jfkDeparturesMultiDestination: FlightsResponse = {
+  ...jfkDepartures,
+  flights: [
+    ...jfkDepartures.flights,
+    {
+      flight_number: "UA200",
+      airline: "United",
+      origin: { iata: "JFK", name: "John F Kennedy" },
+      destination: { iata: "ORD", name: "O'Hare International" },
+      scheduled_time: "2026-01-01T11:00:00Z",
+      estimated_time: null,
+      actual_time: null,
+      status: "scheduled",
+      terminal: "2",
+      gate: "5",
+    },
+  ],
+};
+
 describe("Flights page", () => {
   beforeEach(() => {
     mockedGetFlights.mockReset();
@@ -134,6 +153,99 @@ describe("Flights page", () => {
     },
     10_000,
   );
+});
+
+describe("Flights page — destination search", () => {
+  beforeEach(() => {
+    mockedGetFlights.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("filters departures down to flights matching a destination IATA code", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDeparturesMultiDestination);
+    renderFlights();
+
+    setAirportInput("jfk");
+    await waitFor(() => expect(screen.getAllByText("AA100").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("UA200").length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText("Destination"), { target: { value: "LAX" } });
+
+    await waitFor(() => expect(screen.queryByText("UA200")).not.toBeInTheDocument());
+    expect(screen.getAllByText("AA100").length).toBeGreaterThan(0);
+  });
+
+  it("filters departures down to flights matching a destination airport/city name", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDeparturesMultiDestination);
+    renderFlights();
+
+    setAirportInput("jfk");
+    await waitFor(() => expect(screen.getAllByText("AA100").length).toBeGreaterThan(0));
+
+    fireEvent.change(screen.getByLabelText("Destination"), {
+      target: { value: "Los Angeles" },
+    });
+
+    await waitFor(() => expect(screen.queryByText("UA200")).not.toBeInTheDocument());
+    expect(screen.getAllByText("AA100").length).toBeGreaterThan(0);
+  });
+
+  it("shows a no-match state when no flight goes to the searched destination", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDeparturesMultiDestination);
+    renderFlights();
+
+    setAirportInput("jfk");
+    await waitFor(() => expect(screen.getAllByText("AA100").length).toBeGreaterThan(0));
+
+    fireEvent.change(screen.getByLabelText("Destination"), {
+      target: { value: "Nonexistent City" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("No flights match the selected filters.")).toBeInTheDocument(),
+    );
+  });
+
+  it("combines the destination filter with the airline filter", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDeparturesMultiDestination);
+    const user = userEvent.setup();
+    renderFlights();
+
+    setAirportInput("jfk");
+    await waitFor(() => expect(screen.getAllByText("AA100").length).toBeGreaterThan(0));
+
+    fireEvent.change(screen.getByLabelText("Destination"), { target: { value: "JFK" } });
+    await waitFor(() =>
+      expect(screen.getByText("No flights match the selected filters.")).toBeInTheDocument(),
+    );
+
+    // No flight departs to JFK itself, so combining with an airline filter
+    // still yields no results — clear it and try a destination both flights
+    // could plausibly share instead, filtered further by airline.
+    fireEvent.change(screen.getByLabelText("Destination"), { target: { value: "" } });
+    await user.selectOptions(screen.getByLabelText("Airline"), "United");
+
+    await waitFor(() => expect(screen.queryByText("AA100")).not.toBeInTheDocument());
+    expect(screen.getAllByText("UA200").length).toBeGreaterThan(0);
+  });
+
+  it("hides the destination filter in Arrivals mode", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDeparturesMultiDestination);
+    const user = userEvent.setup();
+    renderFlights();
+
+    setAirportInput("jfk");
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenCalledWith("JFK", "departures"));
+    expect(screen.getByLabelText("Destination")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Arrivals" }));
+
+    expect(screen.queryByLabelText("Destination")).not.toBeInTheDocument();
+  });
 });
 
 describe("Flights page — nearest-airport detection", () => {

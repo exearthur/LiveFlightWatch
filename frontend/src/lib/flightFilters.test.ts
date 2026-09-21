@@ -4,6 +4,7 @@ import {
   ALL_AIRLINES,
   ALL_STATUSES,
   filterFlightsByAirline,
+  filterFlightsByDestination,
   filterFlightsByStatus,
   getUniqueAirlines,
 } from "@/lib/flightFilters";
@@ -117,5 +118,100 @@ describe("filterFlightsByStatus", () => {
 
   it("returns an empty array when no flight matches the status", () => {
     expect(filterFlightsByStatus(flights, "cancelled")).toEqual([]);
+  });
+});
+
+describe("filterFlightsByDestination", () => {
+  const flights = [
+    makeFlight({
+      flight_number: "1",
+      destination: { iata: "LAX", name: "Los Angeles International" },
+    }),
+    makeFlight({
+      flight_number: "2",
+      destination: { iata: "ORD", name: "O'Hare International" },
+    }),
+    makeFlight({
+      flight_number: "3",
+      // Denver's city name ("Denver") doesn't happen to contain "la", unlike
+      // e.g. Atlanta — picked deliberately so it doesn't collide with the
+      // "LA" partial-match test below now that city matching is in play.
+      destination: { iata: "DEN", name: null },
+    }),
+  ];
+
+  it("returns all flights when the query is empty or whitespace", () => {
+    expect(filterFlightsByDestination(flights, "")).toEqual(flights);
+    expect(filterFlightsByDestination(flights, "   ")).toEqual(flights);
+  });
+
+  it("matches by exact IATA code, case-insensitively", () => {
+    const result = filterFlightsByDestination(flights, "lax");
+    expect(result).toHaveLength(1);
+    expect(result[0].flight_number).toBe("1");
+  });
+
+  it("matches by partial IATA code", () => {
+    const result = filterFlightsByDestination(flights, "LA");
+    expect(result).toHaveLength(1);
+    expect(result[0].flight_number).toBe("1");
+  });
+
+  it("matches by partial, case-insensitive airport/city name", () => {
+    const result = filterFlightsByDestination(flights, "los ang");
+    expect(result).toHaveLength(1);
+    expect(result[0].flight_number).toBe("1");
+  });
+
+  it("does not error on flights with a null destination name", () => {
+    expect(filterFlightsByDestination(flights, "den")).toEqual([flights[2]]);
+    expect(filterFlightsByDestination(flights, "nonexistent city")).toEqual([]);
+  });
+
+  it("returns an empty array when no destination matches", () => {
+    expect(filterFlightsByDestination(flights, "JFK")).toEqual([]);
+  });
+
+  it("matches by the destination's city, resolved from the curated airport list", () => {
+    const toJfk = [
+      makeFlight({
+        flight_number: "4",
+        destination: { iata: "JFK", name: "John F. Kennedy International" },
+      }),
+    ];
+
+    // "John F. Kennedy International" doesn't contain "new york" — only the
+    // curated airport list's city field ("New York") makes this match.
+    const result = filterFlightsByDestination(toJfk, "new york");
+    expect(result).toHaveLength(1);
+    expect(result[0].flight_number).toBe("4");
+  });
+
+  it("matches a secondary metro-area airport not in SUPPORTED_AIRPORTS by city", () => {
+    // LGA isn't in SUPPORTED_AIRPORTS (only one airport per metro area is,
+    // for nearest-airport detection) — its city comes from the additional
+    // alias map instead, and "LaGuardia Airport" alone wouldn't match "new
+    // york" without it.
+    const toLga = [
+      makeFlight({
+        flight_number: "5",
+        destination: { iata: "LGA", name: "LaGuardia Airport" },
+      }),
+    ];
+
+    const result = filterFlightsByDestination(toLga, "new york");
+    expect(result).toHaveLength(1);
+    expect(result[0].flight_number).toBe("5");
+  });
+
+  it("does not match by city for a destination with no known city at all", () => {
+    const toUnknown = [
+      makeFlight({
+        flight_number: "6",
+        destination: { iata: "XYZ", name: "Some Regional Airport" },
+      }),
+    ];
+
+    expect(filterFlightsByDestination(toUnknown, "new york")).toEqual([]);
   });
 });
