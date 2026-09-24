@@ -2,14 +2,14 @@
 
 A universal flight tracker — live departures and arrivals for any airport worldwide, plus lookup by flight number. No waiting on the slow board at the gate.
 
-**Live:** [live-flight-watch-gfn2.vercel.app](https://live-flight-watch-gfn2.vercel.app)
+**Live:** [live-flight-watch.vercel.app](https://live-flight-watch.vercel.app)
 
 ## Features
 
 - Live departures/arrivals for any airport by IATA code (e.g. `JFK`, `LHR`)
 - Flight number lookup (e.g. `AA100`) as an alternative search mode
 - Filter results by airline and status
-- Favorites — save a search and jump back to it from the Home page
+- Favorites — save a search and jump back to it from the Favorites page
 - Recently-searched airports for quick re-access
 - Light/dark mode
 - Desktop table + mobile card layout
@@ -39,10 +39,10 @@ backend/
   tests/
 frontend/
   src/
-    pages/          Home, Flights, About, Contact
+    pages/          Flights (home), Favorites, About, Contact
     components/     FlightsTable and shared UI
-    hooks/          useFlights, useFlightLookup, useFavorites, useRecentAirports, useTheme
-    lib/            API client, filter helpers
+    hooks/          useFlights, useFlightLookup, useFavorites, useRecentAirports, useTheme, useNearestAirport
+    lib/            API client, filter/geo helpers
 ```
 
 ## Local development
