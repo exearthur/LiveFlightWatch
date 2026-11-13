@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.config import Settings
 from app.core.cache import TTLCache
-from app.models.flight import Flight, FlightLookupResponse, FlightsResponse, FlightType
+from app.models.flight import FlightLookupResponse, FlightSnapshot, FlightsResponse, FlightType
 from app.providers.factory import build_provider
 from app.services.flight_service import FlightService
 
@@ -21,7 +21,7 @@ def build_flight_service(settings: Settings, http_client: httpx.AsyncClient) -> 
     """Builds the service the routes use. Called once, by the app's lifespan,
     with the HTTP client the lifespan owns."""
     provider = build_provider(settings, http_client)
-    cache: TTLCache[list[Flight]] = TTLCache(
+    cache: TTLCache[FlightSnapshot] = TTLCache(
         ttl_seconds=settings.cache_ttl_seconds,
         max_entries=settings.cache_max_entries,
     )
