@@ -18,7 +18,7 @@ A universal flight tracker — live departures and arrivals for any airport worl
 
 ## Tech stack
 
-**Backend** (`backend/`): Python, FastAPI, httpx (async), Pydantic — a thin proxy over the [AviationStack](https://aviationstack.com/) API with an in-memory TTL cache and a provider-adapter layer so the data source can be swapped later.
+**Backend** (`backend/`): Python, FastAPI, httpx (async), Pydantic — a thin proxy over a flight-data API with an in-memory TTL cache and a provider-adapter layer. Two providers are implemented, [AviationStack](https://aviationstack.com/) (the default) and [AeroDataBox](https://aerodatabox.com/), and a setting picks between them (see [Flight-data provider](#flight-data-provider)).
 
 **Frontend** (`frontend/`): React 19, TypeScript, Vite, Tailwind CSS v4, TanStack Query, React Router.
 
@@ -33,7 +33,7 @@ backend/
   app/
     routers/       FastAPI route handlers
     services/       caching/orchestration between routers and providers
-    providers/      FlightProvider interface + the AviationStack implementation
+    providers/      FlightProvider interface + the AviationStack and AeroDataBox implementations
     models/         Pydantic response schemas
     core/           TTL cache
   tests/
@@ -88,6 +88,23 @@ Also run `npm run lint` and `npm run build` in `frontend/` before pushing — CI
 
 Both return `429` if the upstream provider's rate limit is hit, and `502` on other upstream failures.
 
+## Flight-data provider
+
+The backend can read from either of two providers. These environment variables choose one:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `FLIGHT_PROVIDER` | `aviationstack` | Which provider to call: `aviationstack` or `aerodatabox`. |
+| `AVIATIONSTACK_API_KEY` | none | Required when the provider is `aviationstack`. |
+| `AERODATABOX_API_KEY` | none | Required when the provider is `aerodatabox`. AeroDataBox is reached through RapidAPI, so this is a RapidAPI key from a plan at [rapid.aerodatabox.com/pricing](https://rapid.aerodatabox.com/pricing). |
+| `AERODATABOX_BASE_URL` | `https://aerodatabox.p.rapidapi.com` | The RapidAPI gateway. Leave it alone unless RapidAPI gives you a different host. |
+
+Only the selected provider's key has to be set, and the backend refuses to start without it.
+
+AviationStack's free plan allows 100 calls a month, which a public demo uses up within days. AeroDataBox allows 200 board calls a month for free and 2,500 for $8. [docs/decisions/0001-data-source-strategy.md](docs/decisions/0001-data-source-strategy.md) has the comparison, the traffic arithmetic and the steps to switch.
+
+The AeroDataBox adapter was written from the provider's published API description and is tested against mocked responses only. It has not yet been run against the live API, so check a board and a flight lookup by hand after switching.
+
 ## Deployment
 
 Deploy the backend first, since the frontend needs its live URL. Recommended: Render (backend) + Vercel (frontend), both free-tier.
@@ -97,6 +114,7 @@ Deploy the backend first, since the frontend needs its live URL. Recommended: Re
 1. On [render.com](https://render.com), **New > Blueprint**, connect this GitHub repo. Render will read `render.yaml` at the repo root and configure the service automatically.
 2. When prompted for env vars, set:
    - `AVIATIONSTACK_API_KEY` — your key from [aviationstack.com](https://aviationstack.com/).
+   - `AERODATABOX_API_KEY` — only used when `FLIGHT_PROVIDER` is `aerodatabox` (see [Flight-data provider](#flight-data-provider)). `render.yaml` sets `FLIGHT_PROVIDER` to `aviationstack`, so any placeholder will do until you switch.
    - `CORS_ORIGINS` — leave a placeholder for now (e.g. `http://localhost:5173`); you'll update it once the frontend URL exists (step 3 below).
 3. Deploy, then copy the resulting service URL (e.g. `https://liveflightwatch-backend.onrender.com`).
 4. Note: Render's free tier spins the service down after ~15 minutes idle; the first request after that takes 30-60s to cold-start.
