@@ -6,7 +6,18 @@ services:
     dockerfilePath: backend/Dockerfile
     plan: free
     envVars:
+      # "aviationstack" or "aerodatabox". Change it here rather than in the
+      # dashboard, because a Blueprint sync can reset a value edited there. Set
+      # the chosen provider's API key on the service first: the app will not
+      # start without it.
+      - key: FLIGHT_PROVIDER
+        value: aviationstack
       - key: AVIATIONSTACK_API_KEY
+        sync: false
+      # RapidAPI key for AeroDataBox. Only used when FLIGHT_PROVIDER is
+      # "aerodatabox". Render asks for sync: false values only when the
+      # Blueprint is first created, so add it to an existing service by hand.
+      - key: AERODATABOX_API_KEY
         sync: false
       - key: CORS_ORIGINS
         sync: false

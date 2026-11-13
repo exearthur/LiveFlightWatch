@@ -6,8 +6,8 @@ from typing import Annotated
 from app.config import get_settings
 from app.core.cache import TTLCache
 from app.models.flight import Flight, FlightLookupResponse, FlightsResponse, FlightType
-from app.providers.aviationstack import AviationStackProvider
 from app.providers.base import ProviderError, RateLimitError
+from app.providers.factory import build_provider
 from app.services.flight_service import FlightService
 
 router = APIRouter(prefix="/api", tags=["flights"])
@@ -21,10 +21,7 @@ FLIGHT_NUMBER_PATTERN = "^[A-Za-z]{2,3}[0-9]{1,4}[A-Za-z]?$"
 @lru_cache
 def get_flight_service() -> FlightService:
     settings = get_settings()
-    provider = AviationStackProvider(
-        api_key=settings.aviationstack_api_key,
-        base_url=settings.aviationstack_base_url,
-    )
+    provider = build_provider(settings)
     cache: TTLCache[list[Flight]] = TTLCache(
         ttl_seconds=settings.cache_ttl_seconds,
         max_entries=settings.cache_max_entries,
