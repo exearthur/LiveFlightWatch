@@ -5,7 +5,7 @@ from typing import Annotated
 
 from app.config import get_settings
 from app.core.cache import TTLCache
-from app.models.flight import Flight, FlightLookupResponse, FlightsResponse, FlightType
+from app.models.flight import FlightLookupResponse, FlightSnapshot, FlightsResponse, FlightType
 from app.providers.aviationstack import AviationStackProvider
 from app.providers.base import ProviderError, RateLimitError
 from app.services.flight_service import FlightService
@@ -25,7 +25,7 @@ def get_flight_service() -> FlightService:
         api_key=settings.aviationstack_api_key,
         base_url=settings.aviationstack_base_url,
     )
-    cache: TTLCache[list[Flight]] = TTLCache(
+    cache: TTLCache[FlightSnapshot] = TTLCache(
         ttl_seconds=settings.cache_ttl_seconds,
         max_entries=settings.cache_max_entries,
     )
