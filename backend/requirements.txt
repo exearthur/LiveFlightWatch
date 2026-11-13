@@ -3,3 +3,6 @@ uvicorn[standard]==0.54.0
 pydantic-settings==2.16.2
 python-dotenv==1.2.4
 httpx==0.28.1
+# IANA time-zone data for zoneinfo. Windows and the python:*-slim Docker image
+# ship no zone files, so without this every zone lookup fails there.
+tzdata==2026.6

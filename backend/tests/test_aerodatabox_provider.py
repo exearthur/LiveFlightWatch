@@ -464,3 +464,136 @@ def test_unexpected_board_shape_raises_provider_error() -> None:
 
     with pytest.raises(ProviderError):
         _get_flights(client)
+
+
+# --- the zone the times are shown in ---------------------------------------------
+#
+# Per the OpenAPI description: an airport object may carry `timeZone` (Olson
+# name), and every time has a `local` half. On a board the movement's airport
+# is the one at the other end of the route, so only the offset is available.
+
+
+def test_board_row_reports_the_board_airports_utc_offset() -> None:
+    client = _mock_client(_make_response(json_body={"departures": [_board_row()]}))
+
+    flight = _get_flights(client, "JFK", "departures")[0]
+
+    assert flight.timezone == "-05:00"
+    # the instant itself still comes from the UTC half
+    assert flight.scheduled_time == datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc)
+
+
+def test_board_row_never_borrows_the_opposite_airports_zone() -> None:
+    # the movement's airport is Los Angeles; these are New York times
+    row = _board_row()
+    row["movement"]["airport"]["timeZone"] = "America/Los_Angeles"
+    client = _mock_client(_make_response(json_body={"departures": [row]}))
+
+    assert _get_flights(client, "JFK", "departures")[0].timezone == "-05:00"
+
+
+def test_arrival_board_row_reports_the_offset_at_the_arrival_airport() -> None:
+    row = _board_row(status="Arrived")
+    row["movement"]["airport"] = {
+        "icao": "EGLL",
+        "iata": "LHR",
+        "name": "London Heathrow",
+        "timeZone": "Europe/London",
+    }
+    client = _mock_client(_make_response(json_body={"arrivals": [row]}))
+
+    assert _get_flights(client, "JFK", "arrivals")[0].timezone == "-05:00"
+
+
+@pytest.mark.parametrize(
+    ("utc", "local", "expected"),
+    [
+        # each side of the 1 November 2026 change in New York
+        ("2026-10-31 14:00Z", "2026-10-31 10:00-04:00", "-04:00"),
+        ("2026-11-01 15:00Z", "2026-11-01 10:00-05:00", "-05:00"),
+        # east of Greenwich, a half-hour zone, and UTC itself
+        ("2026-11-13 15:00Z", "2026-11-14 00:00+09:00", "+09:00"),
+        ("2026-11-13 15:00Z", "2026-11-13 20:30+05:30", "+05:30"),
+        ("2026-11-13 15:00Z", "2026-11-13 15:00+00:00", "+00:00"),
+        # a local half with no offset of its own: the gap to the UTC half is used
+        ("2026-11-13 15:00Z", "2026-11-13 10:00", "-05:00"),
+        ("2026-11-13T15:00:00Z", "2026-11-13T10:00:00-05:00", "-05:00"),
+    ],
+)
+def test_utc_offset_is_the_gap_between_the_two_halves(utc: str, local: str, expected: str) -> None:
+    row = _board_row()
+    row["movement"]["scheduledTime"] = _time(utc, local)
+    del row["movement"]["revisedTime"]
+    client = _mock_client(_make_response(json_body={"departures": [row]}))
+
+    assert _get_flights(client)[0].timezone == expected
+
+
+@pytest.mark.parametrize(
+    ("utc", "local"),
+    [
+        # the stated offset is not the gap between the halves
+        ("2026-11-13 15:00Z", "2026-11-13 10:00-08:00"),
+        # further from UTC than any real zone
+        ("2026-11-13 15:00Z", "2026-11-14 15:00"),
+        # not a whole number of minutes
+        ("2026-11-13 15:00Z", "2026-11-13 10:00:30"),
+        ("2026-11-13 15:00Z", "not a time"),
+        ("not a time", "2026-11-13 10:00-05:00"),
+    ],
+)
+def test_no_zone_is_reported_when_the_two_halves_do_not_add_up(utc: str, local: str) -> None:
+    row = _board_row()
+    row["movement"]["scheduledTime"] = _time(utc, local)
+    del row["movement"]["revisedTime"]
+    client = _mock_client(_make_response(json_body={"departures": [row]}))
+
+    assert _get_flights(client)[0].timezone is None
+
+
+def test_offset_falls_back_to_the_revised_then_the_runway_time() -> None:
+    row = _board_row()
+    del row["movement"]["scheduledTime"]
+    client = _mock_client(_make_response(json_body={"departures": [row]}))
+    assert _get_flights(client)[0].timezone == "-05:00"
+
+    del row["movement"]["revisedTime"]
+    row["movement"]["runwayTime"] = _time("2026-11-13 15:12Z", "2026-11-13 10:12-05:00")
+    client = _mock_client(_make_response(json_body={"departures": [row]}))
+    assert _get_flights(client)[0].timezone == "-05:00"
+
+
+def test_row_without_times_reports_no_zone() -> None:
+    row = {"number": "DL 123", "status": "Unknown", "codeshareStatus": "Unknown", "isCargo": False}
+    client = _mock_client(_make_response(json_body={"departures": [row]}))
+
+    assert _get_flights(client)[0].timezone is None
+
+
+def test_flight_lookup_reports_the_departure_airports_named_zone() -> None:
+    status = _flight_status()
+    status["departure"]["airport"]["timeZone"] = "America/New_York"
+    status["arrival"]["airport"]["timeZone"] = "America/Los_Angeles"
+    client = _mock_client(_make_response(json_body=[status]))
+
+    assert _get_flight_by_number(client)[0].timezone == "America/New_York"
+
+
+@pytest.mark.parametrize("time_zone", [None, "", "Mars/Olympus_Mons"])
+def test_flight_lookup_falls_back_to_the_offset_without_a_usable_zone_name(
+    time_zone: str | None,
+) -> None:
+    status = _flight_status()
+    status["departure"]["airport"]["timeZone"] = time_zone
+    client = _mock_client(_make_response(json_body=[status]))
+
+    assert _get_flight_by_number(client)[0].timezone == "-05:00"
+
+
+def test_flight_lookup_without_an_airport_code_does_not_trust_the_zone_name() -> None:
+    # with no code there is no telling whose zone this is
+    status = _flight_status()
+    status["departure"]["airport"] = {"name": "Somewhere", "timeZone": "Asia/Tokyo"}
+    client = _mock_client(_make_response(json_body=[status]))
+
+    assert _get_flight_by_number(client)[0].timezone == "-05:00"
