@@ -1,6 +1,6 @@
 # 0001: Data-source strategy
 
-- **Status:** accepted; takes effect when the owner completes the steps under "What the owner has to do"
+- **Status:** proposed; awaiting the owner's sign-off, because it involves a paid plan. It takes effect when the owner completes the steps under "What the owner has to do"
 - **Date:** 2026-11-13. Every price and quota below was read from the provider's own page on this date.
 - **Ticket:** #8 (LFW-1)
 
