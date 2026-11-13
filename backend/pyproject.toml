@@ -11,11 +11,6 @@ select = ["E", "F", "W", "I", "B"]
 # Line length is not enforced, because the code base has no formatter yet.
 ignore = ["E501"]
 
-[tool.ruff.lint.per-file-ignores]
-# Pre-existing import order. Left alone so this change does not touch a file
-# other open branches are editing; drop this entry once the imports are sorted.
-"app/routers/flights.py" = ["I001"]
-
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's parameter markers are meant to be called in argument defaults.
 extend-immutable-calls = [

@@ -5,7 +5,12 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.config import Settings
 from app.core.cache import TTLCache
-from app.models.flight import FlightLookupResponse, FlightSnapshot, FlightsResponse, FlightType
+from app.models.flight import (
+    FlightLookupResponse,
+    FlightSnapshot,
+    FlightsResponse,
+    FlightType,
+)
 from app.providers.factory import build_provider
 from app.services.flight_service import FlightService
 

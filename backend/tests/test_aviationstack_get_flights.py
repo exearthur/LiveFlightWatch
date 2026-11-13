@@ -1,13 +1,11 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 
 from app.providers.aviationstack import AviationStackProvider
 from app.providers.base import ProviderError, RateLimitError
-
-PROVIDER = AviationStackProvider(api_key="test-key", base_url="https://example.invalid")
 
 
 def _make_response(status_code: int, json_body=None, text: str = ""):
@@ -22,13 +20,14 @@ def _make_response(status_code: int, json_body=None, text: str = ""):
 
 
 def _run_get_flights(response):
-    mock_client = AsyncMock()
+    # Stands in for the app's shared HTTP client, which the provider is given.
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
     mock_client.get.return_value = response
-    mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
+    provider = AviationStackProvider(
+        api_key="test-key", base_url="https://example.invalid", client=mock_client
+    )
 
-    with patch("app.providers.aviationstack.httpx.AsyncClient", return_value=mock_client):
-        return asyncio.run(PROVIDER.get_flights("JFK", "departures"))
+    return asyncio.run(provider.get_flights("JFK", "departures"))
 
 
 def test_http_429_raises_rate_limit_error():
