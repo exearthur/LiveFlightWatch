@@ -1,11 +1,20 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+import pytest
 from fastapi.testclient import TestClient
 
 import app.routers.flights as flights_router_module
+from app.core.cache import TTLCache
 from app.main import app
-from app.models.flight import FlightLookupResponse, FlightsResponse
-from app.providers.base import ProviderError, RateLimitError
+from app.models.flight import (
+    Flight,
+    FlightLookupResponse,
+    FlightSnapshot,
+    FlightsResponse,
+    FlightType,
+)
+from app.providers.base import FlightProvider, ProviderError, RateLimitError
+from app.services.flight_service import FlightService
 
 client = TestClient(app)
 
@@ -165,3 +174,51 @@ def test_lookup_with_no_matching_flights_returns_200_with_empty_list(monkeypatch
 
     assert response.status_code == 200
     assert response.json()["flights"] == []
+
+
+# --- fetched_at on cached responses ------------------------------------------
+
+
+class _StubProvider(FlightProvider):
+    """Returns no flights and counts upstream calls."""
+
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    async def get_flights(self, airport: str, flight_type: FlightType) -> list[Flight]:
+        self.call_count += 1
+        return []
+
+    async def get_flight_by_number(self, flight_number: str) -> list[Flight]:
+        self.call_count += 1
+        return []
+
+
+@pytest.mark.parametrize(
+    ("path", "params"),
+    [
+        pytest.param("/api/flights", {"airport": "JFK", "type": "departures"}, id="airport"),
+        pytest.param("/api/flights/lookup", {"flight_number": "AA100"}, id="lookup"),
+    ],
+)
+def test_cached_response_reports_the_original_fetch_time(
+    monkeypatch: pytest.MonkeyPatch, path: str, params: dict[str, str]
+) -> None:
+    # A real FlightService behind the endpoint, on clocks the test controls.
+    fetched = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    elapsed = timedelta(0)
+    provider = _StubProvider()
+    cache: TTLCache[FlightSnapshot] = TTLCache(
+        ttl_seconds=300, clock=lambda: elapsed.total_seconds()
+    )
+    service = FlightService(provider=provider, cache=cache, clock=lambda: fetched + elapsed)
+    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: service)
+
+    first = client.get(path, params=params).json()
+    elapsed = timedelta(minutes=4)
+    second = client.get(path, params=params).json()
+
+    assert provider.call_count == 1
+    assert (first["cached"], second["cached"]) == (False, True)
+    assert datetime.fromisoformat(first["fetched_at"]) == fetched
+    assert second["fetched_at"] == first["fetched_at"]

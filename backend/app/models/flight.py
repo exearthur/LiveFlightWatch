@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
@@ -36,6 +37,19 @@ class Flight(BaseModel):
     # None when the provider does not say; clients then fall back to the
     # viewer's own zone.
     timezone: str | None = None
+
+
+@dataclass(frozen=True)
+class FlightSnapshot:
+    """One provider result together with the moment it was fetched.
+
+    This is the unit FlightService caches, so a response served from cache
+    reports the age of its data rather than the time of the request. Not part
+    of the API: the response models below copy what they need from it.
+    """
+
+    flights: list[Flight]
+    fetched_at: datetime
 
 
 class FlightsResponse(BaseModel):

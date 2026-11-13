@@ -1,11 +1,7 @@
 import { RefreshCw, Star } from "lucide-react";
 
-function timeAgo(iso: string): string {
-  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  return `${Math.round(seconds / 60)}m ago`;
-}
+import { useNow } from "@/hooks/useNow";
+import { timeAgo } from "@/lib/timeAgo";
 
 interface FlightsResultsHeaderProps {
   /** Number of results currently shown (after any client-side filters). */
@@ -28,6 +24,10 @@ interface FlightsResultsHeaderProps {
  * Status line for a loaded result set: how many results are shown, how old
  * the data is and whether it came from cache, plus the favorite/refresh
  * actions. Rendered inside `FlightSearchForm`, which pushes it to the right.
+ *
+ * The age is measured from `fetchedAt` against a clock that ticks every
+ * second, so it keeps counting between refetches, and while polling is
+ * paused, rather than showing the age as of the last render.
  */
 export function FlightsResultsHeader({
   count,
@@ -38,11 +38,13 @@ export function FlightsResultsHeader({
   onRefresh,
   favorite,
 }: FlightsResultsHeaderProps) {
+  const now = useNow();
+
   return (
     <div className="ml-auto flex items-center gap-3 text-sm text-neutral-500 dark:text-neutral-400">
       <span>
         <span className="font-medium text-neutral-700 dark:text-neutral-300">{count}</span>{" "}
-        {countLabel} · updated {timeAgo(fetchedAt)}
+        {countLabel} · updated {timeAgo(fetchedAt, now)}
         {cached && " (cached)"}
       </span>
       {favorite && (

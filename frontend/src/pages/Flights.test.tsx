@@ -4,27 +4,29 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getFlights } from "@/lib/api";
+import { getFlightByNumber, getFlights } from "@/lib/api";
 import Flights from "@/pages/Flights";
-import type { FlightsResponse } from "@/types/flight";
+import type { FlightLookupResponse, FlightsResponse } from "@/types/flight";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
     getFlights: vi.fn(),
+    getFlightByNumber: vi.fn(),
   };
 });
 
 const mockedGetFlights = vi.mocked(getFlights);
+const mockedGetFlightByNumber = vi.mocked(getFlightByNumber);
 
-function renderFlights() {
+function renderFlights(initialUrl = "/") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialUrl]}>
         <Flights />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -153,6 +155,59 @@ describe("Flights page", () => {
     },
     10_000,
   );
+});
+
+describe("Flights page — data age", () => {
+  beforeEach(() => {
+    mockedGetFlights.mockReset();
+    mockedGetFlightByNumber.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  // Fetched far enough into the minute that the label stays put for the
+  // length of a test, without faking the clock under TanStack Query.
+  const threeMinutesAgo = () => new Date(Date.now() - (3 * 60 + 20) * 1000).toISOString();
+
+  it("labels freshly fetched airport flights as updated just now", async () => {
+    mockedGetFlights.mockResolvedValue({ ...jfkDepartures, fetched_at: new Date().toISOString() });
+    renderFlights();
+
+    setAirportInput("jfk");
+
+    expect(await screen.findByText(/flights · updated just now$/)).toBeInTheDocument();
+  });
+
+  it("labels cached airport flights with the age of the data, not of the response", async () => {
+    mockedGetFlights.mockResolvedValue({
+      ...jfkDepartures,
+      cached: true,
+      fetched_at: threeMinutesAgo(),
+    });
+    renderFlights();
+
+    setAirportInput("jfk");
+
+    expect(await screen.findByText(/flights · updated 3m ago \(cached\)$/)).toBeInTheDocument();
+  });
+
+  it("labels a cached flight-number lookup with the age of the data", async () => {
+    const lookup: FlightLookupResponse = {
+      flight_number: "AA100",
+      fetched_at: threeMinutesAgo(),
+      cached: true,
+      flights: jfkDepartures.flights,
+    };
+    mockedGetFlightByNumber.mockResolvedValue(lookup);
+
+    renderFlights("/?mode=flight&flight=AA100");
+
+    expect(await screen.findByText(/result · updated 3m ago \(cached\)$/)).toBeInTheDocument();
+    expect(mockedGetFlightByNumber).toHaveBeenCalledWith("AA100");
+  });
 });
 
 describe("Flights page — destination search", () => {
