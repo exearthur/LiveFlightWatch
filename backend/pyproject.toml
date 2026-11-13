@@ -1,0 +1,54 @@
+# Tool configuration only. Dependencies live in requirements.txt (runtime)
+# and requirements-dev.txt (test/lint tools); pytest settings are in pytest.ini.
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, import sorting and bugbear. Deliberately a small
+# set: it catches real mistakes without dictating style.
+select = ["E", "F", "W", "I", "B"]
+# Line length is not enforced, because the code base has no formatter yet.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Pre-existing import order. Left alone so this change does not touch a file
+# other open branches are editing; drop this entry once the imports are sorted.
+"app/routers/flights.py" = ["I001"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's parameter markers are meant to be called in argument defaults.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Security",
+]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+# Teaches mypy that BaseSettings fields can come from the environment, so
+# `Settings()` with no arguments type-checks.
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+# Measured 94% when this floor was set; raise it as coverage improves.
+fail_under = 90
+show_missing = true
+skip_covered = true
