@@ -17,5 +17,29 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: true,
+    // Only collected when run with `--coverage` (`npm run test:coverage`).
+    coverage: {
+      provider: "v8",
+      // Every source file counts, including ones no test imports, so the
+      // numbers describe the whole app rather than just the tested parts.
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/test/**",
+        "src/**/*.d.ts",
+        "src/types/**",
+        "src/main.tsx",
+      ],
+      reporter: ["text", "text-summary"],
+      // Floors, set about five points under what was measured when they were
+      // added (statements 59.9, branches 55.9, functions 52.0, lines 59.3).
+      // Raise them as coverage improves.
+      thresholds: {
+        statements: 55,
+        branches: 50,
+        functions: 47,
+        lines: 55,
+      },
+    },
   },
 })

@@ -22,9 +22,9 @@ A universal flight tracker — live departures and arrivals for any airport worl
 
 **Frontend** (`frontend/`): React 19, TypeScript, Vite, Tailwind CSS v4, TanStack Query, React Router.
 
-**Testing**: pytest (backend), Vitest + React Testing Library (frontend).
+**Testing**: pytest (backend), Vitest + React Testing Library (frontend), both with coverage.
 
-**CI**: GitHub Actions runs both test suites, plus frontend lint and build, on every push to `main` and every PR (`.github/workflows/ci.yml`).
+**CI**: GitHub Actions runs ruff, mypy and pytest on the backend and lint, tests and build on the frontend, on every push to `main` and every PR (`.github/workflows/ci.yml`). Both test suites report coverage and fail below a minimum threshold. Dependabot opens weekly dependency update PRs (`.github/dependabot.yml`).
 
 ## Project structure
 
@@ -52,12 +52,14 @@ frontend/
 ```
 cd backend
 python -m venv .venv && .venv\Scripts\activate   # or `source .venv/bin/activate` on macOS/Linux
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime deps plus pytest, ruff and mypy
 cp .env.example .env   # then fill in a real AVIATIONSTACK_API_KEY from aviationstack.com
 uvicorn app.main:app --reload --port 8000
 ```
 
 API docs are then available at `http://localhost:8000/docs`.
+
+Dependencies are pinned to exact versions. `requirements.txt` holds what the app needs to run and is all the Docker image installs; `requirements-dev.txt` adds the test and lint tools on top of it.
 
 ### Frontend
 
@@ -71,11 +73,13 @@ npm run dev
 ## Testing
 
 ```
-cd backend && pytest -v
-cd frontend && npm run test    # or `npm run test:watch`
+cd backend && pytest --cov             # tests with coverage, fails under 90%
+cd backend && ruff check . && mypy     # lint and type check
+cd frontend && npm run test            # or `npm run test:watch`
+cd frontend && npm run test:coverage   # tests with coverage, fails under the thresholds in vitest.config.ts
 ```
 
-Also run `npm run lint` and `npm run build` in `frontend/` before pushing — CI checks both.
+Also run `npm run lint` and `npm run build` in `frontend/` before pushing — CI checks both, along with everything above.
 
 ## API reference
 
