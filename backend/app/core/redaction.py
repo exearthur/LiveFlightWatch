@@ -21,8 +21,11 @@ MAX_EXCERPT_CHARS = 200
 # `access_key=...` in a URL or `"X-RapidAPI-Key": "..."` in an echoed request:
 # the value is removed whatever it is, so a key in an encoding the exact-value
 # pass below does not anticipate is still caught when it sits next to its name.
+# A value that is already the marker is skipped, so redacting twice (a
+# provider does it, then the error handler does it again) changes nothing.
 _NAMED_SECRET = re.compile(
-    r"""(?<![A-Za-z0-9_])(access_key|x-rapidapi-key)(["']?\s*[=:]\s*["']?)[^\s"'&,;<>)}\]]+""",
+    r"""(?<![A-Za-z0-9_])(access_key|x-rapidapi-key)(["']?\s*[=:]\s*["']?)"""
+    rf"""(?!{re.escape(REDACTED)})[^\s"'&,;<>)}}\]]+""",
     re.IGNORECASE,
 )
 
