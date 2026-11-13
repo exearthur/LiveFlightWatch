@@ -2,6 +2,7 @@ from typing import Any
 
 import httpx
 
+from app.core.redaction import SecretRedactor
 from app.models.flight import Airport, Flight, FlightStatus, FlightType
 from app.providers.base import FlightProvider, ProviderError, RateLimitError
 
@@ -33,9 +34,15 @@ def _clean(value: str | None) -> str | None:
 
 
 class AviationStackProvider(FlightProvider):
-    def __init__(self, api_key: str, base_url: str):
+    def __init__(self, api_key: str, base_url: str, client: httpx.AsyncClient):
         self._api_key = api_key
         self._base_url = base_url
+        # The app's shared client (see app/main.py). Not closed here: its
+        # creator owns it.
+        self._client = client
+        # The key travels as a query parameter, so it is part of every
+        # request URL and of anything upstream that echoes the request.
+        self._redactor = SecretRedactor([api_key])
 
     async def get_flights(self, airport: str, flight_type: FlightType) -> list[Flight]:
         params = {"access_key": self._api_key}
@@ -59,11 +66,19 @@ class AviationStackProvider(FlightProvider):
         return [self._to_flight(raw, "departures") for raw in raw_flights]
 
     async def _fetch(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+        # Every message raised here ends up in the server log, never in a
+        # response, and anything upstream-supplied in it (exception text,
+        # error code, body) goes through the redactor first.
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(self._base_url, params=params)
-        except httpx.HTTPError as exc:
-            raise ProviderError(f"Request to AviationStack failed: {exc}") from exc
+            response = await self._client.get(self._base_url, params=params)
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
+            # `from None`: the httpx exception holds the request, and so the
+            # URL with the key in it. Chaining it would put it back within
+            # reach of anything that logs a traceback.
+            raise ProviderError(
+                f"Request to AviationStack failed: {type(exc).__name__}: "
+                f"{self._redactor.excerpt(str(exc))}"
+            ) from None
 
         try:
             payload = response.json()
@@ -71,30 +86,35 @@ class AviationStackProvider(FlightProvider):
             payload = None
 
         error_body = payload.get("error") if isinstance(payload, dict) else None
-        error_code = error_body.get("code") if isinstance(error_body, dict) else None
+        raw_code = error_body.get("code") if isinstance(error_body, dict) else None
+        error_code = raw_code if isinstance(raw_code, str) else None
+
+        def describe(summary: str) -> str:
+            # Only built on a failure: redacting a full, successful response
+            # body on every call would be wasted work.
+            status = f"status {response.status_code}"
+            if error_code is not None:
+                status += f", error code {self._redactor.excerpt(error_code)}"
+            upstream = str(error_body) if error_body is not None else response.text
+            return f"{summary} ({status}): {self._redactor.excerpt(upstream)}"
 
         if response.status_code == 429 or error_code in _RATE_LIMIT_ERROR_CODES:
-            message = (
-                error_body.get("message")
-                if isinstance(error_body, dict)
-                else "AviationStack rate limit or monthly quota exceeded"
-            )
-            raise RateLimitError(message)
+            raise RateLimitError(describe("AviationStack rate limit or monthly quota exceeded"))
 
         if response.status_code != 200:
-            raise ProviderError(
-                f"AviationStack returned status {response.status_code}: {response.text[:200]}"
-            )
+            raise ProviderError(describe("AviationStack returned an error"))
 
         if payload is None:
-            raise ProviderError("AviationStack returned a non-JSON response")
+            raise ProviderError(describe("AviationStack returned a non-JSON response"))
 
         if error_body is not None:
-            raise ProviderError(f"AviationStack error: {error_body}")
+            raise ProviderError(describe("AviationStack reported an error"))
 
-        raw_flights = payload.get("data")
-        if raw_flights is None:
-            raise ProviderError("AviationStack response missing 'data' field")
+        # A body that is valid JSON but not the documented object with a
+        # `data` list is an upstream failure like any other, not a crash.
+        raw_flights = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(raw_flights, list):
+            raise ProviderError(describe("AviationStack response missing 'data' list"))
 
         return raw_flights
 
