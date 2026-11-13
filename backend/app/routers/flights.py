@@ -25,7 +25,10 @@ def get_flight_service() -> FlightService:
         api_key=settings.aviationstack_api_key,
         base_url=settings.aviationstack_base_url,
     )
-    cache: TTLCache[list[Flight]] = TTLCache(ttl_seconds=settings.cache_ttl_seconds)
+    cache: TTLCache[list[Flight]] = TTLCache(
+        ttl_seconds=settings.cache_ttl_seconds,
+        max_entries=settings.cache_max_entries,
+    )
     return FlightService(provider=provider, cache=cache)
 
 
