@@ -25,7 +25,8 @@ from app.errors import RATE_LIMIT_DETAIL, UPSTREAM_FAILURE_DETAIL
 from app.main import create_app
 from app.providers.aerodatabox import AeroDataBoxProvider
 from app.providers.aviationstack import AviationStackProvider
-from app.providers.base import FlightProvider, ProviderError
+from app.providers.base import FlightProvider, ProviderError, RateLimitError
+from app.routers.flights import get_flight_service
 
 KEYS = {
     "aviationstack": "as-live-7f3a9c2e41d85b60",
@@ -371,7 +372,9 @@ def test_httpx_request_line_for_an_upstream_call_is_logged_without_the_key(
         client.get(path, params=ENDPOINTS[path])
 
     upstream_lines = [
-        r.getMessage() for r in caplog.records if r.name == "httpx" and UPSTREAM_HOST in r.getMessage()
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "httpx" and UPSTREAM_HOST in record.getMessage()
     ]
     # httpx logged the upstream request, so there was something to redact
     assert len(upstream_lines) == 1
@@ -429,6 +432,50 @@ def test_successful_response_carries_no_key_either(caplog: pytest.LogCaptureFixt
     forms = _forms_of(KEYS["aviationstack"])
     _assert_absent_from_response(forms, response)
     _assert_absent_from_logs(forms, caplog)
+
+
+class _CarelessService:
+    """A flight service whose provider forgot to redact its error message."""
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+
+    async def get_flights(self, airport: str, flight_type: str) -> None:
+        raise self._error
+
+    async def get_flight_by_number(self, flight_number: str) -> None:
+        raise self._error
+
+
+@pytest.mark.parametrize("path", ENDPOINTS)
+@pytest.mark.parametrize("error_type", [ProviderError, RateLimitError])
+def test_error_handler_redacts_every_configured_key_itself(
+    error_type: type[ProviderError], path: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Providers redact their own key at source. The handler does not rely on
+    that: it redacts both configured keys again before it logs."""
+    caplog.set_level(logging.DEBUG)
+    error = error_type(
+        f"{UPSTREAM_MARKER} status 503 for ?access_key={KEYS['aviationstack']} "
+        f"and X-RapidAPI-Key: {KEYS['aerodatabox']}"
+    )
+    upstream = _Upstream(_server_error)
+    app = create_app(_settings("aviationstack"), http_client_factory=upstream.client_factory)
+    app.dependency_overrides[get_flight_service] = lambda: _CarelessService(error)
+
+    with TestClient(app) as client:
+        response = client.get(path, params=ENDPOINTS[path])
+
+    expected_status = 429 if error_type is RateLimitError else 502
+    assert response.status_code == expected_status
+    assert response.json() == {"detail": GENERIC_DETAILS[expected_status]}
+    forms = _forms_of(KEYS["aviationstack"]) | _forms_of(KEYS["aerodatabox"])
+    _assert_absent_from_response(forms, response)
+    assert UPSTREAM_MARKER not in response.text
+    _assert_absent_from_logs(forms, caplog)
+    [failure_line] = [r.getMessage() for r in caplog.records if r.name == "app.errors"]
+    assert "status 503" in failure_line
+    assert failure_line.count(REDACTED) == 2
 
 
 # --- the exception a provider raises -----------------------------------------------

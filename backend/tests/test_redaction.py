@@ -109,7 +109,9 @@ def test_redacting_twice_changes_nothing() -> None:
 
     once = redactor.redact(text)
 
-    assert once == f"GET https://x.example/?access_key={REDACTED}&dep_iata=JFK failed for key {REDACTED}"
+    assert once == (
+        f"GET https://x.example/?access_key={REDACTED}&dep_iata=JFK failed for key {REDACTED}"
+    )
     assert redactor.redact(once) == once
 
 
@@ -163,6 +165,23 @@ def test_log_filter_redacts_message_and_arguments(caplog: pytest.LogCaptureFixtu
     assert record.args is None
     assert KEY not in repr(vars(record))
     assert KEY not in caplog.text
+
+
+def test_log_filter_drops_arguments_it_cannot_format(caplog: pytest.LogCaptureFixture) -> None:
+    logger = logging.getLogger("tests.redaction.unformattable")
+    log_filter = RedactingLogFilter(SecretRedactor([KEY]))
+    logger.addFilter(log_filter)
+    caplog.set_level(logging.DEBUG)
+
+    try:
+        # one placeholder, two arguments: getMessage() raises TypeError
+        logger.info("request to %s", "https://x.example/", KEY)
+    finally:
+        logger.removeFilter(log_filter)
+
+    [record] = [r for r in caplog.records if r.name == logger.name]
+    assert record.getMessage() == "request to %s"
+    assert KEY not in repr(vars(record))
 
 
 # --- redacted_http_logs() ------------------------------------------------------------

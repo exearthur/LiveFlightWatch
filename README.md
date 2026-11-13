@@ -86,7 +86,12 @@ Also run `npm run lint` and `npm run build` in `frontend/` before pushing — CI
 - `GET /api/flights?airport={IATA}&type=departures|arrivals` — flights for an airport (defaults to `departures`).
 - `GET /api/flights/lookup?flight_number={code}` — a specific flight (e.g. `AA100`).
 
-Both return `429` if the upstream provider's rate limit is hit, and `502` on other upstream failures.
+Both return `429` if the upstream provider's rate limit is hit, and `502` on other upstream failures. The body is `{"detail": "<message>"}`, and the message is fixed for each status:
+
+- `429`: `The flight-data provider's request limit has been reached. Please try again later.`
+- `502`: `The flight-data provider is unavailable right now. Please try again in a few minutes.`
+
+Nothing from the provider's own response is passed on to the client. The provider's status code, error code and message are written to the backend log instead, with the API key redacted.
 
 ## Flight-data provider
 

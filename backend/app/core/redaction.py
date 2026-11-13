@@ -75,6 +75,14 @@ class RedactingLogFilter(logging.Filter):
         self._redactor = redactor
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = self._redactor.redact(record.getMessage())
+        try:
+            message = record.getMessage()
+        except (TypeError, ValueError):
+            # The template and its arguments do not fit together. Raising
+            # here would fail the HTTP call that tried to log; passing the
+            # record on would let its arguments through unchecked. Keep the
+            # template and drop the arguments.
+            message = str(record.msg)
+        record.msg = self._redactor.redact(message)
         record.args = None
         return True

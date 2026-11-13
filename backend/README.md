@@ -54,6 +54,25 @@ Then visit `http://localhost:8000/docs` for interactive API docs, or try:
 http://localhost:8000/api/flights?airport=JFK&type=departures
 ```
 
+## Upstream calls and errors
+
+All calls to the provider go through one `httpx.AsyncClient`. The app creates
+it when it starts and closes it when it shuts down (the lifespan in
+`app/main.py`), so connections to the provider are reused.
+
+When the provider fails, the client gets a `502` (or a `429` for a rate limit
+or used-up quota) with a fixed, generic message. What the provider actually
+said is logged by `app.errors`, at ERROR for a 502 and WARNING for a 429:
+
+```
+Flight provider failure on GET /api/flights, responding 502: AviationStack returned an error (status 401, error code 'invalid_access_key'): ...
+```
+
+API keys are redacted before anything is logged. That includes the request
+line httpx logs for every upstream call, which for AviationStack would
+otherwise contain `access_key=<your key>`. The app adds no log handlers or
+formats of its own; it uses whatever uvicorn or the host has configured.
+
 ## Running tests
 
 ```
