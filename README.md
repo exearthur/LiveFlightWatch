@@ -13,6 +13,7 @@ A universal flight tracker — live departures and arrivals for any airport worl
 - Recently-searched airports for quick re-access
 - Light/dark mode
 - Desktop table + mobile card layout
+- Times shown in the airport's own local time with a zone label (e.g. `10:45 PM EST`), whichever time zone you are viewing from, with the date added when a time is not on today's date at the airport
 - Searches are shareable via URL (filters sync to query params) and support browser back/forward
 - Graceful handling of the flight-data provider's rate limit (a "quota reached" state instead of a generic error, with polling paused until it clears)
 
@@ -42,7 +43,7 @@ frontend/
     pages/          Flights (home), Favorites, About, Contact
     components/     FlightsTable and shared UI
     hooks/          useFlights, useFlightLookup, useFavorites, useRecentAirports, useTheme, useNearestAirport
-    lib/            API client, filter/geo helpers
+    lib/            API client, filter/geo helpers, flight-time formatting
   e2e/              Playwright smoke test, with its mocked API and fixtures
 ```
 
@@ -103,6 +104,14 @@ Both return `429` if the upstream provider's rate limit is hit, and `502` on oth
 - `502`: `The flight-data provider is unavailable right now. Please try again in a few minutes.`
 
 Nothing from the provider's own response is passed on to the client. The provider's status code, error code and message are written to the backend log instead, with the API key redacted.
+
+### Times and time zones
+
+Each flight's `scheduled_time`, `estimated_time` and `actual_time` are instants in UTC (e.g. `2026-11-13T04:50:00Z`), never airport wall-clock values. The flight's `timezone` field says which zone to show them in: the zone of the airport the times belong to. That is the origin on a departures board and on a flight-number lookup, and the destination on an arrivals board. It is an IANA name such as `America/New_York`, or a fixed offset such as `-05:00` when the provider gives only an offset, or `null` when the provider does not say.
+
+The frontend formats every time in that zone and labels it (`11:50 PM EST`), so a viewer in Tokyo and a viewer in Atlanta see the same board. With no `timezone` it falls back to the viewer's own zone, still labelled. The clock style (12 or 24 hour) and the zone abbreviations follow the viewer's browser locale.
+
+AviationStack does not send real UTC: see [Provider time formats](backend/README.md#provider-time-formats) for how each provider's times are read.
 
 ## Flight-data provider
 

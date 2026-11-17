@@ -1,0 +1,242 @@
+{
+  "_note": "Four rows, unedited, from a real AviationStack /v1/flights?dep_iata=ATL response. Captured 2026-11-13T05:42:12Z, which was 00:42 EST in Atlanta. No API key is included.",
+  "_captured_at_utc": "2026-11-13T05:42:12.270305+00:00",
+  "data": [
+    {
+      "flight_date": "2026-11-12",
+      "flight_status": "active",
+      "departure": {
+        "airport": "Hartsfield-jackson Atlanta International",
+        "timezone": "America/New_York",
+        "iata": "ATL",
+        "icao": "KATL",
+        "terminal": "I",
+        "gate": "F8",
+        "delay": 4,
+        "scheduled": "2026-11-12T23:50:00+00:00",
+        "estimated": "2026-11-12T23:50:00+00:00",
+        "actual": "2026-11-12T23:54:00+00:00",
+        "estimated_runway": "2026-11-12T23:54:00+00:00",
+        "actual_runway": "2026-11-12T23:54:00+00:00"
+      },
+      "arrival": {
+        "airport": "Seoul (Incheon)",
+        "timezone": "Asia/Seoul",
+        "iata": "ICN",
+        "icao": "RKSI",
+        "terminal": "2",
+        "gate": "261",
+        "baggage": null,
+        "scheduled": "2026-11-14T05:45:00+00:00",
+        "delay": 0,
+        "estimated": "2026-11-14T04:38:00+00:00",
+        "actual": null,
+        "estimated_runway": "2026-11-14T04:38:00+00:00",
+        "actual_runway": null
+      },
+      "airline": {
+        "name": "Korean Air",
+        "iata": "KE",
+        "icao": "KAL"
+      },
+      "flight": {
+        "number": "5036",
+        "iata": "KE5036",
+        "icao": "KAL5036",
+        "codeshared": {
+          "airline_name": "delta air lines",
+          "airline_iata": "dl",
+          "airline_icao": "dal",
+          "flight_number": "27",
+          "flight_iata": "dl27",
+          "flight_icao": "dal27"
+        }
+      },
+      "aircraft": {
+        "registration": null,
+        "iata": null,
+        "icao": null,
+        "icao24": "A6A347"
+      },
+      "live": {
+        "updated": "2026-11-13T05:23:47+00:00",
+        "latitude": 35.8381,
+        "longitude": -86.208,
+        "altitude": 10241.3,
+        "direction": 307,
+        "speed_horizontal": 766.728,
+        "speed_vertical": 0,
+        "is_ground": false
+      }
+    },
+    {
+      "flight_date": "2026-11-12",
+      "flight_status": "active",
+      "departure": {
+        "airport": "Hartsfield-jackson Atlanta International",
+        "timezone": "America/New_York",
+        "iata": "ATL",
+        "icao": "KATL",
+        "terminal": "S",
+        "gate": "B1",
+        "delay": 24,
+        "scheduled": "2026-11-12T22:49:00+00:00",
+        "estimated": "2026-11-12T22:49:00+00:00",
+        "actual": "2026-11-12T23:13:00+00:00",
+        "estimated_runway": "2026-11-12T23:13:00+00:00",
+        "actual_runway": "2026-11-12T23:13:00+00:00"
+      },
+      "arrival": {
+        "airport": "Dallas/Fort Worth International",
+        "timezone": "America/Chicago",
+        "iata": "DFW",
+        "icao": "KDFW",
+        "terminal": "E",
+        "gate": "E14",
+        "baggage": "E14",
+        "scheduled": "2026-11-13T00:17:00+00:00",
+        "delay": 0,
+        "estimated": "2026-11-13T00:06:00+00:00",
+        "actual": null,
+        "estimated_runway": "2026-11-13T00:06:00+00:00",
+        "actual_runway": null
+      },
+      "airline": {
+        "name": "WestJet",
+        "iata": "WS",
+        "icao": "WJA"
+      },
+      "flight": {
+        "number": "6499",
+        "iata": "WS6499",
+        "icao": "WJA6499",
+        "codeshared": {
+          "airline_name": "delta air lines",
+          "airline_iata": "dl",
+          "airline_icao": "dal",
+          "flight_number": "818",
+          "flight_iata": "dl818",
+          "flight_icao": "dal818"
+        }
+      },
+      "aircraft": {
+        "registration": null,
+        "iata": null,
+        "icao": null,
+        "icao24": "A3C246"
+      },
+      "live": {
+        "updated": "2026-11-13T05:24:21+00:00",
+        "latitude": 32.5016,
+        "longitude": -93.126,
+        "altitude": 9144,
+        "direction": 262,
+        "speed_horizontal": 788.952,
+        "speed_vertical": 0,
+        "is_ground": false
+      }
+    },
+    {
+      "flight_date": "2026-11-13",
+      "flight_status": "scheduled",
+      "departure": {
+        "airport": "Hartsfield-jackson Atlanta International",
+        "timezone": "America/New_York",
+        "iata": "ATL",
+        "icao": "KATL",
+        "terminal": "S",
+        "gate": "A3",
+        "delay": 0,
+        "scheduled": "2026-11-13T07:05:00+00:00",
+        "estimated": "2026-11-13T07:05:00+00:00",
+        "actual": null,
+        "estimated_runway": "2026-11-13T07:05:00+00:00",
+        "actual_runway": null
+      },
+      "arrival": {
+        "airport": "Orlando International",
+        "timezone": "America/New_York",
+        "iata": "MCO",
+        "icao": "KMCO",
+        "terminal": "B",
+        "gate": "75",
+        "baggage": "30",
+        "scheduled": "2026-11-13T08:40:00+00:00",
+        "delay": null,
+        "estimated": null,
+        "actual": null,
+        "estimated_runway": null,
+        "actual_runway": null
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      },
+      "flight": {
+        "number": "2204",
+        "iata": "DL2204",
+        "icao": "DAL2204",
+        "codeshared": null
+      },
+      "aircraft": {
+        "registration": null,
+        "iata": null,
+        "icao": null,
+        "icao24": "A92145"
+      },
+      "live": null
+    },
+    {
+      "flight_date": "2026-11-13",
+      "flight_status": "scheduled",
+      "departure": {
+        "airport": "Hartsfield-jackson Atlanta International",
+        "timezone": "America/New_York",
+        "iata": "ATL",
+        "icao": "KATL",
+        "terminal": "S",
+        "gate": "C21",
+        "delay": 0,
+        "scheduled": "2026-11-13T07:00:00+00:00",
+        "estimated": "2026-11-13T07:00:00+00:00",
+        "actual": null,
+        "estimated_runway": "2026-11-13T07:00:00+00:00",
+        "actual_runway": null
+      },
+      "arrival": {
+        "airport": "Lambert-St. Louis International",
+        "timezone": "America/Chicago",
+        "iata": "STL",
+        "icao": "KSTL",
+        "terminal": "2",
+        "gate": "E14",
+        "baggage": null,
+        "scheduled": "2026-11-13T07:40:00+00:00",
+        "delay": null,
+        "estimated": null,
+        "actual": null,
+        "estimated_runway": null,
+        "actual_runway": null
+      },
+      "airline": {
+        "name": "Southwest Airlines",
+        "iata": "WN",
+        "icao": "SWA"
+      },
+      "flight": {
+        "number": "4625",
+        "iata": "WN4625",
+        "icao": "SWA4625",
+        "codeshared": null
+      },
+      "aircraft": {
+        "registration": null,
+        "iata": null,
+        "icao": null,
+        "icao24": "AD2CE1"
+      },
+      "live": null
+    }
+  ]
+}

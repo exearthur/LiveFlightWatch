@@ -16,6 +16,7 @@ from pydantic import TypeAdapter, ValidationError
 from app.core.redaction import SecretRedactor
 from app.models.flight import Airport, Flight, FlightStatus, FlightType
 from app.providers.base import FlightProvider, ProviderError, RateLimitError
+from app.providers.timezones import load_zone
 
 # Same rule the AviationStack adapter applies, so "delayed" means the same
 # thing whichever provider is selected.
@@ -63,18 +64,44 @@ def _text(value: Any) -> str | None:
     return value.strip()
 
 
-def _parse_time(value: Any) -> datetime | None:
-    """Reads the UTC half of a `{"utc": ..., "local": ...}` time object."""
-    raw = _dict(value).get("utc")
+def _parse_datetime(raw: Any) -> datetime | None:
     if not isinstance(raw, str):
         return None
     try:
-        parsed = _DATETIME_ADAPTER.validate_python(raw)
+        return _DATETIME_ADAPTER.validate_python(raw)
     except ValidationError:
         return None
-    if parsed.tzinfo is None:
+
+
+def _parse_time(value: Any) -> datetime | None:
+    """Reads the UTC half of a `{"utc": ..., "local": ...}` time object."""
+    parsed = _parse_datetime(_dict(value).get("utc"))
+    if parsed is not None and parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed
+
+
+def _utc_offset(value: Any) -> str | None:
+    """The airport's UTC offset at one `{"utc": ..., "local": ...}` time, as
+    "+HH:MM" / "-HH:MM", worked out from how far the local half's wall clock
+    is from the UTC half's. None unless both halves are present and agree.
+    """
+    utc = _parse_time(value)
+    local = _parse_datetime(_dict(value).get("local"))
+    if utc is None or local is None:
+        return None
+    offset = local.replace(tzinfo=None) - utc.astimezone(timezone.utc).replace(tzinfo=None)
+    stated = local.utcoffset()
+    if stated is not None and stated != offset:
+        # The local half names an offset that is not the gap between the two
+        # halves, so one of them is not what this adapter takes it to be.
+        return None
+    minutes, remainder = divmod(offset, timedelta(minutes=1))
+    # Real zones run from UTC-12:00 to UTC+14:00 in whole minutes.
+    if remainder or not -12 * 60 <= minutes <= 14 * 60:
+        return None
+    hours, minutes_part = divmod(abs(minutes), 60)
+    return f"{'-' if minutes < 0 else '+'}{hours:02d}:{minutes_part:02d}"
 
 
 def _airport(value: Any) -> Airport:
@@ -243,6 +270,24 @@ class AeroDataBoxProvider(FlightProvider):
             status = "delayed"
 
         happened = _DEPARTED_STATUSES if flight_type == "departures" else _ARRIVED_STATUSES
+
+        # The zone to show this leg's times in. Its name is only known when
+        # the leg carries its own airport, as a flight-status leg does. On an
+        # airport board the movement's `airport` is the one at the other end
+        # of the route and nothing in the response names the board airport's
+        # zone, so there the offset of the local half of a time stands in.
+        own_airport = origin if flight_type == "departures" else destination
+        leg_airport = _dict(leg.get("airport"))
+        zone = None
+        if own_airport.iata and _text(leg_airport.get("iata")) == own_airport.iata:
+            zone = load_zone(leg_airport.get("timeZone"))
+        display_zone = (
+            zone.key
+            if zone is not None
+            else _utc_offset(leg.get("scheduledTime"))
+            or _utc_offset(leg.get("revisedTime"))
+            or _utc_offset(leg.get("runwayTime"))
+        )
         # The API accepts, and may return, spaced flight numbers ("DL 123");
         # the rest of the app, and the lookup endpoint's own validation, use
         # the compact form.
@@ -259,4 +304,5 @@ class AeroDataBoxProvider(FlightProvider):
             status=status,
             terminal=_text(leg.get("terminal")),
             gate=_text(leg.get("gate")),
+            timezone=display_zone,
         )

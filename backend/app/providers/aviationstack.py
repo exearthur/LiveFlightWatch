@@ -1,10 +1,16 @@
+import logging
+from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
 from app.core.redaction import SecretRedactor
 from app.models.flight import Airport, Flight, FlightStatus, FlightType
 from app.providers.base import FlightProvider, ProviderError, RateLimitError
+from app.providers.timezones import load_zone
+
+logger = logging.getLogger(__name__)
 
 DELAY_THRESHOLD_MINUTES = 15
 
@@ -31,6 +37,41 @@ def _clean(value: str | None) -> str | None:
     if value is None or value.strip().lower() in _PLACEHOLDER_VALUES:
         return None
     return value
+
+
+def _to_instant(value: Any, zone: ZoneInfo | None) -> datetime | None:
+    """Turns one of a leg's `scheduled`/`estimated`/`actual` values into a
+    real instant (UTC).
+
+    AviationStack labels every one of these `+00:00`, but the digits are the
+    wall-clock time at that leg's own airport (the leg's `timezone` field),
+    not UTC: a 23:50 departure from Atlanta arrives as
+    "2026-11-12T23:50:00+00:00". Confirmed against a captured response in
+    November 2026; backend/README.md has the evidence. So the offset is
+    ignored and the digits are read in `zone`.
+
+    Around a daylight-saving change a wall-clock time can be ambiguous or
+    not exist. An ambiguous time (clocks go back, the hour happens twice) is
+    read as its first occurrence. A time in the skipped hour (clocks go
+    forward) is read with the offset from before the change, which lands it
+    the same distance past the change: 02:30 becomes 03:30.
+
+    A value with a non-zero offset cannot be this mislabelling, so it is
+    taken as the instant it states. Anything else without a known zone
+    cannot be placed on the timeline and becomes None rather than a time
+    that is wrong by the airport's UTC offset.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.utcoffset():
+        return parsed.astimezone(timezone.utc)
+    if zone is None:
+        return None
+    return parsed.replace(tzinfo=zone, fold=0).astimezone(timezone.utc)
 
 
 class AviationStackProvider(FlightProvider):
@@ -135,15 +176,28 @@ class AviationStackProvider(FlightProvider):
             _clean(flight_info.get("iata")) or _clean(flight_info.get("number")) or "Unknown"
         )
 
+        # Each leg's times are in that leg's airport's zone; see _to_instant.
+        zone = load_zone(leg.get("timezone"))
+        if zone is None:
+            logger.warning(
+                "AviationStack gave no usable time zone (%r) for the %s leg of %s at %s; "
+                "its times cannot be placed and are dropped",
+                leg.get("timezone"),
+                "departure" if flight_type == "departures" else "arrival",
+                flight_number,
+                leg.get("iata"),
+            )
+
         return Flight(
             flight_number=flight_number,
             airline=_clean(airline.get("name")),
             origin=Airport(iata=departure.get("iata", ""), name=_clean(departure.get("airport"))),
             destination=Airport(iata=arrival.get("iata", ""), name=_clean(arrival.get("airport"))),
-            scheduled_time=leg.get("scheduled"),
-            estimated_time=leg.get("estimated"),
-            actual_time=leg.get("actual"),
+            scheduled_time=_to_instant(leg.get("scheduled"), zone),
+            estimated_time=_to_instant(leg.get("estimated"), zone),
+            actual_time=_to_instant(leg.get("actual"), zone),
             status=status,
             terminal=_clean(leg.get("terminal")),
             gate=_clean(leg.get("gate")),
+            timezone=zone.key if zone is not None else None,
         )

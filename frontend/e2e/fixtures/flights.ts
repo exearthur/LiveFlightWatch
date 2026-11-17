@@ -34,6 +34,8 @@ function flight(
     actual_time: null,
     terminal: "4",
     gate: "B22",
+    // Every board here is JFK's, so its times are shown in New York time.
+    timezone: "America/New_York",
     ...overrides,
   };
 }

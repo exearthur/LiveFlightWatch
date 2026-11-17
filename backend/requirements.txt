@@ -3,3 +3,6 @@ uvicorn[standard]==0.54.0
 pydantic-settings==2.16.2
 python-dotenv==1.2.4
 httpx==0.28.1
+# IANA time-zone data for zoneinfo, so zone lookups do not depend on the host
+# having zone files of its own. Windows has none.
+tzdata==2026.6

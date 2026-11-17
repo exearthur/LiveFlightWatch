@@ -1,5 +1,7 @@
 import { Plane } from "lucide-react";
 
+import { useNow } from "@/hooks/useNow";
+import { formatFlightTime } from "@/lib/flightTime";
 import { cn } from "@/lib/utils";
 import type { Flight, FlightStatus } from "@/types/flight";
 
@@ -34,11 +36,34 @@ const STATUS_STYLES: Record<FlightStatus, { badge: string; dot: string }> = {
   },
 };
 
-function formatTime(value: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+// How often the table re-checks which date is "today", so the date shown
+// beside a time on another day stays right across midnight.
+const DAY_CHECK_INTERVAL_MS = 60_000;
+
+/**
+ * One time in the airport's own zone with its zone label ("10:45 PM EST"),
+ * plus the date underneath when that is not today's date at the airport: a
+ * board mixes this evening's flights with tomorrow morning's.
+ */
+function FlightTime({
+  value,
+  timeZone,
+  now,
+}: {
+  value: string | null;
+  timeZone: string | null | undefined;
+  now: number;
+}) {
+  const label = formatFlightTime(value, timeZone, { now });
+  if (!label || !value) return <>—</>;
+  return (
+    <>
+      <time dateTime={value}>{label.time}</time>
+      {label.date && (
+        <span className="block text-xs text-neutral-400 dark:text-neutral-500">{label.date}</span>
+      )}
+    </>
+  );
 }
 
 function StatusBadge({ status }: { status: FlightStatus }) {
@@ -69,6 +94,8 @@ export function FlightsTable({
   emptyTitle,
   emptyDescription,
 }: FlightsTableProps) {
+  const now = useNow(DAY_CHECK_INTERVAL_MS);
+
   if (flights.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-300 py-16 text-center dark:border-neutral-700">
@@ -121,10 +148,10 @@ export function FlightsTable({
                       {other.name ?? (other.iata || "—")}
                     </td>
                     <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                      {formatTime(flight.scheduled_time)}
+                      <FlightTime value={flight.scheduled_time} timeZone={flight.timezone} now={now} />
                     </td>
                     <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                      {formatTime(flight.estimated_time)}
+                      <FlightTime value={flight.estimated_time} timeZone={flight.timezone} now={now} />
                     </td>
                     <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
                       {[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "—"}
@@ -173,13 +200,13 @@ export function FlightsTable({
                 <div>
                   <p className="text-xs text-neutral-400 dark:text-neutral-500">Scheduled</p>
                   <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                    {formatTime(flight.scheduled_time)}
+                    <FlightTime value={flight.scheduled_time} timeZone={flight.timezone} now={now} />
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-neutral-400 dark:text-neutral-500">Estimated</p>
                   <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                    {formatTime(flight.estimated_time)}
+                    <FlightTime value={flight.estimated_time} timeZone={flight.timezone} now={now} />
                   </p>
                 </div>
                 <div>

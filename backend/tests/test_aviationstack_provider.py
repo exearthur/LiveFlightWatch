@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
@@ -44,6 +45,7 @@ def _raw_flight(**overrides):
         "flight_status": "active",
         "departure": {
             "airport": "John F Kennedy International",
+            "timezone": "America/New_York",
             "iata": "JFK",
             "terminal": "4",
             "gate": "B22",
@@ -54,6 +56,7 @@ def _raw_flight(**overrides):
         },
         "arrival": {
             "airport": "Los Angeles International",
+            "timezone": "America/Los_Angeles",
             "iata": "LAX",
             "terminal": "B",
             "gate": None,
@@ -99,9 +102,11 @@ def test_to_flight_maps_departure_fields():
     assert flight.destination.name == "Los Angeles International"
     assert flight.terminal == "4"
     assert flight.gate == "B22"
-    assert flight.scheduled_time is not None
-    assert flight.estimated_time is not None
+    # 10:00 and 10:05 on the wall clock at JFK in September (EDT, UTC-4)
+    assert flight.scheduled_time == datetime(2026, 9, 18, 14, 0, tzinfo=timezone.utc)
+    assert flight.estimated_time == datetime(2026, 9, 18, 14, 5, tzinfo=timezone.utc)
     assert flight.actual_time is None
+    assert flight.timezone == "America/New_York"
     assert flight.status == "active"
 
 
@@ -114,6 +119,9 @@ def test_to_flight_maps_arrival_fields_using_arrival_leg():
     # for arrivals, terminal/gate/times come from the arrival leg, not departure
     assert flight.terminal == "B"
     assert flight.gate is None
+    # 13:00 on the wall clock at LAX in September (PDT, UTC-7)
+    assert flight.scheduled_time == datetime(2026, 9, 18, 20, 0, tzinfo=timezone.utc)
+    assert flight.timezone == "America/Los_Angeles"
     assert flight.status == "active"
 
 
