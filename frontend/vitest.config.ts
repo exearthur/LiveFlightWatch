@@ -1,7 +1,7 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import { defineConfig } from "vitest/config"
+import { configDefaults, defineConfig } from "vitest/config"
 
 // Separate from vite.config.ts so `tsc -b` (frontend build) never has to
 // type-check Vitest-only config, while tests still get the same plugins
@@ -17,6 +17,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: true,
+    // e2e/ holds Playwright specs, run by `npm run test:e2e`.
+    exclude: [...configDefaults.exclude, "e2e/**"],
     // Only collected when run with `--coverage` (`npm run test:coverage`).
     coverage: {
       provider: "v8",

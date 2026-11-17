@@ -22,9 +22,9 @@ A universal flight tracker — live departures and arrivals for any airport worl
 
 **Frontend** (`frontend/`): React 19, TypeScript, Vite, Tailwind CSS v4, TanStack Query, React Router.
 
-**Testing**: pytest (backend), Vitest + React Testing Library (frontend), both with coverage.
+**Testing**: pytest (backend), Vitest + React Testing Library (frontend), both with coverage, plus a Playwright end-to-end smoke test of the frontend against a mocked API.
 
-**CI**: GitHub Actions runs ruff, mypy and pytest on the backend and lint, tests and build on the frontend, on every push to `main` and every PR (`.github/workflows/ci.yml`). Both test suites report coverage and fail below a minimum threshold. Dependabot opens weekly dependency update PRs (`.github/dependabot.yml`).
+**CI**: GitHub Actions runs ruff, mypy and pytest on the backend, lint, tests and build on the frontend, and the end-to-end smoke test in Chromium, on every push to `main` and every PR (`.github/workflows/ci.yml`). Both test suites report coverage and fail below a minimum threshold. Dependabot opens weekly dependency update PRs (`.github/dependabot.yml`).
 
 ## Project structure
 
@@ -43,6 +43,7 @@ frontend/
     components/     FlightsTable and shared UI
     hooks/          useFlights, useFlightLookup, useFavorites, useRecentAirports, useTheme, useNearestAirport
     lib/            API client, filter/geo helpers
+  e2e/              Playwright smoke test, with its mocked API and fixtures
 ```
 
 ## Local development
@@ -80,6 +81,16 @@ cd frontend && npm run test:coverage   # tests with coverage, fails under the th
 ```
 
 Also run `npm run lint` and `npm run build` in `frontend/` before pushing — CI checks both, along with everything above.
+
+### End-to-end smoke test
+
+```
+cd frontend
+npx playwright install chromium   # once, to download the browser
+npm run test:e2e
+```
+
+Playwright builds the frontend, serves it with `vite preview` and drives it in headless Chromium: searching an airport, filtering, saving a favorite, a rate-limited API and a flight-number lookup. The API is mocked in the browser from `frontend/e2e/fixtures/flights.ts`, so it needs no backend, no `.env` file and no API key. After a failure, `npx playwright show-report` opens the report with a trace of each failed test; CI uploads the same report as an artifact.
 
 ## API reference
 
