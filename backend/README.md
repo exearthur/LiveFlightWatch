@@ -42,6 +42,54 @@ provider's published API description and is tested against mocked responses
 only. It has not been run against the live API yet. The reasons for having two
 providers are in `../docs/decisions/0001-data-source-strategy.md`.
 
+## Provider time formats
+
+Every `Flight` time the API returns is a UTC instant, and `Flight.timezone`
+names the zone to show it in (see "Times and time zones" in `../README.md`).
+The two providers need different handling to get there.
+
+**AviationStack labels local times as UTC.** Every `scheduled`, `estimated`
+and `actual` value ends in `+00:00`, but the digits are the wall-clock time at
+that leg's own airport, whose IANA zone is in the leg's `timezone` field. The
+adapter (`_to_instant` in `app/providers/aviationstack.py`) therefore ignores
+the offset and reads the digits in that zone. Two things follow:
+
+- A leg with no `timezone`, or one the zone database does not know, has its
+  times dropped (`null`) and a warning logged. Passing the digits through as
+  UTC would show a time that is wrong by the airport's offset.
+- A wall-clock time in the hour that repeats when clocks go back is read as
+  its first occurrence. One in the hour that is skipped when clocks go forward
+  is moved forward by the gap (02:30 becomes 03:30).
+
+This was checked in November 2026 against one real response for Atlanta
+departures, four rows of which are kept in
+`tests/fixtures/aviationstack_atl_departures.json`:
+
+- Delta 27 to Seoul (listed as its codeshare KE5036) came back as
+  `"scheduled": "2026-11-12T23:50:00+00:00"`. FlightStats listed that flight
+  as scheduled for 23:50 EST.
+- Its `live.updated` position report, a field that is real UTC, was
+  `2026-11-13T05:23:47Z` with the aircraft over Tennessee. The `actual`
+  departure of `23:54` fits as Eastern time (04:54Z) and not as UTC.
+- Its arrival was `2026-11-14T05:45:00+00:00` with `Asia/Seoul`: a 15 h 55 min
+  flight read as Seoul time, a 29 h 55 min one read as UTC.
+
+If AviationStack ever starts sending true UTC, the board will be off by each
+airport's offset. `tests/test_aviationstack_times.py` is the place to start.
+
+**AeroDataBox gives each time twice**, as `{"utc": ..., "local": ...}`. The
+adapter takes the instant from `utc`. For the zone, a flight-status leg names
+its own airport, so that airport's `timeZone` is used. An airport board does
+not: each row's `airport` is the one at the other end of the route, and
+nothing in the response names the board airport's zone. There the adapter
+reports the offset between the two halves of a time, such as `-05:00`, and the
+frontend labels it `GMT-5`. Like the rest of that adapter this follows the
+published API description and has not been checked against a live response.
+
+Zone lookups use Python's `zoneinfo`. `tzdata` is pinned in `requirements.txt`
+so they work on a host with no zone files of its own, such as Windows, and do
+not depend on what a container image happens to ship.
+
 ## Run
 
 ```

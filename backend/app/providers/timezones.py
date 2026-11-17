@@ -9,7 +9,7 @@ def load_zone(name: Any) -> ZoneInfo | None:
     not in the zone database.
 
     Zone data comes from the pinned `tzdata` package wherever the host has no
-    zone files of its own (Windows, slim container images).
+    zone files of its own, as on Windows.
     """
     if not isinstance(name, str) or not name.strip():
         return None

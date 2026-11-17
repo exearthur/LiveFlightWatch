@@ -11,7 +11,7 @@ from app.providers.timezones import load_zone
 @pytest.fixture
 def no_system_zone_files() -> Iterator[None]:
     """Hides the host's zone database, leaving only the `tzdata` package, as
-    on Windows and in the python:*-slim Docker image."""
+    on Windows or in a container image that ships no zone files."""
     zoneinfo.reset_tzpath(to=[])
     zoneinfo.ZoneInfo.clear_cache()
     try:
