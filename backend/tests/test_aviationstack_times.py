@@ -11,13 +11,20 @@ import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
+import httpx
 import pytest
 
 from app.providers.aviationstack import AviationStackProvider, _to_instant
 from app.providers.timezones import load_zone
 
-PROVIDER = AviationStackProvider(api_key="test-key", base_url="https://example.invalid")
+# Nothing here sends a request, so the client is a placeholder.
+PROVIDER = AviationStackProvider(
+    api_key="test-key",
+    base_url="https://example.invalid",
+    client=MagicMock(spec=httpx.AsyncClient),
+)
 
 CAPTURE = json.loads(
     (Path(__file__).parent / "fixtures" / "aviationstack_atl_departures.json").read_text(

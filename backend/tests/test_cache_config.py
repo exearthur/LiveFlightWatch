@@ -1,5 +1,7 @@
 from typing import Any
+from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
@@ -40,16 +42,9 @@ def test_cache_max_entries_below_one_is_rejected(max_entries: int) -> None:
         _settings(cache_max_entries=max_entries)
 
 
-def test_flight_service_cache_is_built_with_configured_max_entries(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        flights_router_module,
-        "get_settings",
-        lambda: _settings(cache_max_entries=3),
+def test_flight_service_cache_is_built_with_configured_max_entries() -> None:
+    service = flights_router_module.build_flight_service(
+        _settings(cache_max_entries=3), MagicMock(spec=httpx.AsyncClient)
     )
-
-    # __wrapped__ bypasses lru_cache so the app-wide service is left untouched
-    service = flights_router_module.get_flight_service.__wrapped__()
 
     assert service._cache.max_entries == 3
