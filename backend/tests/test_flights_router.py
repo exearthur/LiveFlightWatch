@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-import app.routers.flights as flights_router_module
 from app.core.cache import TTLCache
+from app.errors import RATE_LIMIT_DETAIL, UPSTREAM_FAILURE_DETAIL
 from app.main import app
 from app.models.flight import (
     Flight,
@@ -14,9 +14,25 @@ from app.models.flight import (
     FlightType,
 )
 from app.providers.base import FlightProvider, ProviderError, RateLimitError
+from app.routers.flights import get_flight_service
 from app.services.flight_service import FlightService
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _running_app():
+    """Starts the app for the tests in this module. TestClient only runs the
+    lifespan, which builds the HTTP client and the flight service, when it
+    is used as a context manager."""
+    with client:
+        yield
+
+
+def _use_service(monkeypatch, service) -> None:
+    """Makes the routes use `service` instead of the one the lifespan built.
+    monkeypatch removes the override again when the test ends."""
+    monkeypatch.setitem(app.dependency_overrides, get_flight_service, lambda: service)
 
 
 class _FakeService:
@@ -52,25 +68,25 @@ def test_missing_airport_returns_422():
 
 def test_provider_error_is_mapped_to_502(monkeypatch):
     fake_service = _FakeService(error=ProviderError("upstream failed"))
-    # get_flight_service() is called directly inside the handler (not via
-    # FastAPI's Depends()), so app.dependency_overrides won't intercept it.
-    # Patch the name in the flights router module instead.
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+    _use_service(monkeypatch, fake_service)
 
     response = client.get("/api/flights", params={"airport": "JFK", "type": "departures"})
 
     assert response.status_code == 502
-    assert "upstream failed" in response.json()["detail"]
+    # the client gets a fixed message; the provider's own goes to the log
+    assert response.json() == {"detail": UPSTREAM_FAILURE_DETAIL}
+    assert "upstream failed" not in response.text
 
 
 def test_rate_limit_error_is_mapped_to_429(monkeypatch):
     fake_service = _FakeService(error=RateLimitError("monthly quota exceeded"))
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+    _use_service(monkeypatch, fake_service)
 
     response = client.get("/api/flights", params={"airport": "JFK", "type": "departures"})
 
     assert response.status_code == 429
-    assert "monthly quota exceeded" in response.json()["detail"]
+    assert response.json() == {"detail": RATE_LIMIT_DETAIL}
+    assert "monthly quota exceeded" not in response.text
 
 
 def test_valid_request_returns_flights_response(monkeypatch):
@@ -82,7 +98,7 @@ def test_valid_request_returns_flights_response(monkeypatch):
         flights=[],
     )
     fake_service = _FakeService(response=sample_response)
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+    _use_service(monkeypatch, fake_service)
 
     response = client.get("/api/flights", params={"airport": "jfk", "type": "departures"})
 
@@ -107,7 +123,7 @@ def test_flight_type_defaults_to_departures(monkeypatch):
                 flights=[],
             )
 
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: RecordingService())
+    _use_service(monkeypatch, RecordingService())
 
     response = client.get("/api/flights", params={"airport": "JFK"})
 
@@ -132,12 +148,24 @@ def test_lookup_missing_flight_number_returns_422():
 
 def test_lookup_provider_error_is_mapped_to_502(monkeypatch):
     fake_service = _FakeService(error=ProviderError("upstream failed"))
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+    _use_service(monkeypatch, fake_service)
 
     response = client.get("/api/flights/lookup", params={"flight_number": "AA100"})
 
     assert response.status_code == 502
-    assert "upstream failed" in response.json()["detail"]
+    assert response.json() == {"detail": UPSTREAM_FAILURE_DETAIL}
+    assert "upstream failed" not in response.text
+
+
+def test_lookup_rate_limit_error_is_mapped_to_429(monkeypatch):
+    fake_service = _FakeService(error=RateLimitError("monthly quota exceeded"))
+    _use_service(monkeypatch, fake_service)
+
+    response = client.get("/api/flights/lookup", params={"flight_number": "AA100"})
+
+    assert response.status_code == 429
+    assert response.json() == {"detail": RATE_LIMIT_DETAIL}
+    assert "monthly quota exceeded" not in response.text
 
 
 def test_lookup_valid_request_returns_flight_lookup_response(monkeypatch):
@@ -148,7 +176,7 @@ def test_lookup_valid_request_returns_flight_lookup_response(monkeypatch):
         flights=[],
     )
     fake_service = _FakeService(response=sample_response)
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+    _use_service(monkeypatch, fake_service)
 
     response = client.get("/api/flights/lookup", params={"flight_number": "aa100"})
 
@@ -168,7 +196,7 @@ def test_lookup_with_no_matching_flights_returns_200_with_empty_list(monkeypatch
         flights=[],
     )
     fake_service = _FakeService(response=sample_response)
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: fake_service)
+    _use_service(monkeypatch, fake_service)
 
     response = client.get("/api/flights/lookup", params={"flight_number": "ZZ9999"})
 
@@ -212,7 +240,7 @@ def test_cached_response_reports_the_original_fetch_time(
         ttl_seconds=300, clock=lambda: elapsed.total_seconds()
     )
     service = FlightService(provider=provider, cache=cache, clock=lambda: fetched + elapsed)
-    monkeypatch.setattr(flights_router_module, "get_flight_service", lambda: service)
+    _use_service(monkeypatch, service)
 
     first = client.get(path, params=params).json()
     elapsed = timedelta(minutes=4)

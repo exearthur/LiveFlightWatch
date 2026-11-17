@@ -5,7 +5,14 @@ from app.models.flight import Flight, FlightType
 
 class ProviderError(Exception):
     """Raised when the upstream flight-data provider fails or returns
-    something the adapter can't make sense of."""
+    something the adapter can't make sense of.
+
+    The message is for the server log only. It is never sent to a client
+    (app/errors.py answers with a fixed, generic message), and it must not
+    contain an API key: a provider that puts upstream text in it (a response
+    body, an exception string, a URL) passes that text through its
+    `SecretRedactor` first.
+    """
 
 
 class RateLimitError(ProviderError):

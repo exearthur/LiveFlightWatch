@@ -1,5 +1,7 @@
 from typing import Any
+from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
@@ -8,6 +10,9 @@ from app.config import Settings
 from app.providers.aerodatabox import AeroDataBoxProvider
 from app.providers.aviationstack import AviationStackProvider
 from app.providers.factory import build_provider
+
+# Stands in for the app's shared HTTP client. Nothing here sends a request.
+_CLIENT = MagicMock(spec=httpx.AsyncClient)
 
 _PROVIDER_ENV_VARS = (
     "FLIGHT_PROVIDER",
@@ -86,7 +91,7 @@ def test_aerodatabox_does_not_need_an_aviationstack_key() -> None:
 
 
 def test_build_provider_returns_aviationstack_by_default() -> None:
-    provider = build_provider(_settings(aviationstack_api_key="as-key"))
+    provider = build_provider(_settings(aviationstack_api_key="as-key"), _CLIENT)
 
     assert isinstance(provider, AviationStackProvider)
     assert provider._api_key == "as-key"
@@ -95,7 +100,7 @@ def test_build_provider_returns_aviationstack_by_default() -> None:
 
 def test_build_provider_returns_aerodatabox_when_selected() -> None:
     provider = build_provider(
-        _settings(flight_provider="aerodatabox", aerodatabox_api_key="adb-key")
+        _settings(flight_provider="aerodatabox", aerodatabox_api_key="adb-key"), _CLIENT
     )
 
     assert isinstance(provider, AeroDataBoxProvider)
@@ -106,24 +111,38 @@ def test_build_provider_returns_aerodatabox_when_selected() -> None:
 
 def test_build_provider_ignores_the_unselected_providers_key() -> None:
     provider = build_provider(
-        _settings(aviationstack_api_key="as-key", aerodatabox_api_key="adb-key")
+        _settings(aviationstack_api_key="as-key", aerodatabox_api_key="adb-key"), _CLIENT
     )
 
     assert isinstance(provider, AviationStackProvider)
 
 
+@pytest.mark.parametrize(
+    "settings_kwargs",
+    [
+        pytest.param({"aviationstack_api_key": "as-key"}, id="aviationstack"),
+        pytest.param(
+            {"flight_provider": "aerodatabox", "aerodatabox_api_key": "adb-key"},
+            id="aerodatabox",
+        ),
+    ],
+)
+def test_build_provider_hands_the_shared_client_to_the_provider(
+    settings_kwargs: dict[str, Any],
+) -> None:
+    provider = build_provider(_settings(**settings_kwargs), _CLIENT)
+
+    assert isinstance(provider, AviationStackProvider | AeroDataBoxProvider)
+    assert provider._client is _CLIENT
+
+
 # --- the flight service the routes use -------------------------------------------
 
 
-def test_flight_service_uses_aviationstack_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        flights_router_module,
-        "get_settings",
-        lambda: _settings(aviationstack_api_key="as-key"),
+def test_flight_service_uses_aviationstack_by_default() -> None:
+    service = flights_router_module.build_flight_service(
+        _settings(aviationstack_api_key="as-key"), _CLIENT
     )
-
-    # __wrapped__ bypasses lru_cache so the app-wide service is left untouched
-    service = flights_router_module.get_flight_service.__wrapped__()
 
     assert isinstance(service._provider, AviationStackProvider)
 
@@ -133,8 +152,7 @@ def test_flight_service_uses_the_provider_selected_in_the_environment(
 ) -> None:
     monkeypatch.setenv("FLIGHT_PROVIDER", "aerodatabox")
     monkeypatch.setenv("AERODATABOX_API_KEY", "adb-key")
-    monkeypatch.setattr(flights_router_module, "get_settings", _settings)
 
-    service = flights_router_module.get_flight_service.__wrapped__()
+    service = flights_router_module.build_flight_service(_settings(), _CLIENT)
 
     assert isinstance(service._provider, AeroDataBoxProvider)

@@ -8,7 +8,7 @@ talks to the live API.
 import asyncio
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -18,7 +18,6 @@ from app.providers.aerodatabox import AeroDataBoxProvider
 from app.providers.base import ProviderError, RateLimitError
 
 BASE_URL = "https://aerodatabox.example.invalid"
-PROVIDER = AeroDataBoxProvider(api_key="test-key", base_url=BASE_URL)
 
 
 def _make_response(status_code: int = 200, json_body: Any = None, text: str = "") -> MagicMock:
@@ -33,28 +32,28 @@ def _make_response(status_code: int = 200, json_body: Any = None, text: str = ""
 
 
 def _mock_client(response: MagicMock | None = None, error: Exception | None = None) -> AsyncMock:
-    """Stands in for `httpx.AsyncClient(...)` used as an async context
-    manager, with `client.get(...)` resolving to `response` or raising."""
-    client = AsyncMock()
+    """Stands in for the app's shared `httpx.AsyncClient`, with
+    `client.get(...)` resolving to `response` or raising."""
+    client = AsyncMock(spec=httpx.AsyncClient)
     if error is not None:
         client.get.side_effect = error
     else:
         client.get.return_value = response
-    client.__aenter__.return_value = client
-    client.__aexit__.return_value = None
     return client
+
+
+def _provider(client: AsyncMock, base_url: str = BASE_URL) -> AeroDataBoxProvider:
+    return AeroDataBoxProvider(api_key="test-key", base_url=base_url, client=client)
 
 
 def _get_flights(
     client: AsyncMock, airport: str = "JFK", flight_type: FlightType = "departures"
 ) -> list[Flight]:
-    with patch("app.providers.aerodatabox.httpx.AsyncClient", return_value=client):
-        return asyncio.run(PROVIDER.get_flights(airport, flight_type))
+    return asyncio.run(_provider(client).get_flights(airport, flight_type))
 
 
 def _get_flight_by_number(client: AsyncMock, flight_number: str = "DL123") -> list[Flight]:
-    with patch("app.providers.aerodatabox.httpx.AsyncClient", return_value=client):
-        return asyncio.run(PROVIDER.get_flight_by_number(flight_number))
+    return asyncio.run(_provider(client).get_flight_by_number(flight_number))
 
 
 def _time(utc: str, local: str) -> dict[str, str]:
@@ -154,11 +153,9 @@ def test_requests_authenticate_with_rapidapi_headers_not_query_params() -> None:
 
 
 def test_trailing_slash_on_base_url_does_not_double_up() -> None:
-    provider = AeroDataBoxProvider(api_key="k", base_url=f"{BASE_URL}/")
     client = _mock_client(_make_response(json_body={"departures": []}))
 
-    with patch("app.providers.aerodatabox.httpx.AsyncClient", return_value=client):
-        asyncio.run(provider.get_flights("JFK", "departures"))
+    asyncio.run(_provider(client, base_url=f"{BASE_URL}/").get_flights("JFK", "departures"))
 
     args, _ = client.get.call_args
     assert args[0] == f"{BASE_URL}/flights/airports/iata/JFK"

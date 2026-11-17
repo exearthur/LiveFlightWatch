@@ -13,6 +13,7 @@ from urllib.parse import quote
 import httpx
 from pydantic import TypeAdapter, ValidationError
 
+from app.core.redaction import SecretRedactor
 from app.models.flight import Airport, Flight, FlightStatus, FlightType
 from app.providers.base import FlightProvider, ProviderError, RateLimitError
 
@@ -85,8 +86,14 @@ def _airport(value: Any) -> Airport:
 
 
 class AeroDataBoxProvider(FlightProvider):
-    def __init__(self, api_key: str, base_url: str) -> None:
+    def __init__(self, api_key: str, base_url: str, client: httpx.AsyncClient) -> None:
         self._base_url = base_url.rstrip("/")
+        # The app's shared client (see app/main.py). Not closed here: its
+        # creator owns it.
+        self._client = client
+        # The key travels in a header, not the URL, but an upstream error
+        # could still echo the request back.
+        self._redactor = SecretRedactor([api_key])
         # RapidAPI routes on the host header, which is always the gateway's
         # own hostname.
         self._headers = {
@@ -170,11 +177,21 @@ class AeroDataBoxProvider(FlightProvider):
     async def _fetch(self, url: str, params: dict[str, str]) -> Any:
         """Returns the decoded JSON body, or None when the API answers 204
         (nothing matched)."""
+        # Every message raised here ends up in the server log, never in a
+        # response, and anything upstream-supplied in it (exception text,
+        # body) goes through the redactor first.
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(url, params=params, headers=self._headers)
-        except httpx.HTTPError as exc:
-            raise ProviderError(f"Request to AeroDataBox failed: {exc}") from exc
+            # The key headers are sent per request rather than set on the
+            # shared client, which is not this provider's to configure.
+            response = await self._client.get(url, params=params, headers=self._headers)
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
+            # `from None`: the httpx exception holds the request, and so the
+            # key header. Chaining it would put it back within reach of
+            # anything that logs a traceback.
+            raise ProviderError(
+                f"Request to AeroDataBox failed: {type(exc).__name__}: "
+                f"{self._redactor.excerpt(str(exc))}"
+            ) from None
 
         if response.status_code == 204:
             return None
@@ -184,17 +201,22 @@ class AeroDataBoxProvider(FlightProvider):
         except ValueError:
             payload = None
 
-        if response.status_code == 429:
-            message = _text(_dict(payload).get("message"))
-            raise RateLimitError(message or "AeroDataBox rate limit or monthly quota exceeded")
-
-        if response.status_code != 200:
-            raise ProviderError(
-                f"AeroDataBox returned status {response.status_code}: {response.text[:200]}"
+        def describe(summary: str) -> str:
+            # Only built on a failure: redacting a full, successful response
+            # body on every call would be wasted work.
+            upstream = _text(_dict(payload).get("message")) or response.text
+            return (
+                f"{summary} (status {response.status_code}): {self._redactor.excerpt(upstream)}"
             )
 
+        if response.status_code == 429:
+            raise RateLimitError(describe("AeroDataBox rate limit or monthly quota exceeded"))
+
+        if response.status_code != 200:
+            raise ProviderError(describe("AeroDataBox returned an error"))
+
         if payload is None:
-            raise ProviderError("AeroDataBox returned a non-JSON response")
+            raise ProviderError(describe("AeroDataBox returned a non-JSON response"))
 
         return payload
 
