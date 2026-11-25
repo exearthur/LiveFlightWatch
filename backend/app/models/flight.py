@@ -37,6 +37,11 @@ class Flight(BaseModel):
     # None when the provider does not say; clients then fall back to the
     # viewer's own zone.
     timezone: str | None = None
+    # The ICAO flight designator the aircraft uses as its radio callsign
+    # ("DAL27" for DL27), which is how live-position services identify it.
+    # For a codeshare it is the operating flight's, not the one sold. None
+    # when the provider does not give it.
+    callsign: str | None = None
 
 
 @dataclass(frozen=True)

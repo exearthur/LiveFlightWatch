@@ -188,6 +188,11 @@ class AviationStackProvider(FlightProvider):
                 leg.get("iata"),
             )
 
+        # The aircraft transmits the operating flight's designator, so a
+        # codeshare's callsign comes from the flight it is sold on.
+        codeshared = flight_info.get("codeshared") or {}
+        callsign = _clean(codeshared.get("flight_icao")) or _clean(flight_info.get("icao"))
+
         return Flight(
             flight_number=flight_number,
             airline=_clean(airline.get("name")),
@@ -200,4 +205,5 @@ class AviationStackProvider(FlightProvider):
             terminal=_clean(leg.get("terminal")),
             gate=_clean(leg.get("gate")),
             timezone=zone.key if zone is not None else None,
+            callsign=callsign.upper() if callsign else None,
         )

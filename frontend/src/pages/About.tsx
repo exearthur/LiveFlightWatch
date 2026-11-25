@@ -56,7 +56,18 @@ const CREDITS: { name: string; href: string; role: string }[] = [
     href: "https://aviationweather.gov/",
     role: "Airport weather reports (METAR), from the US National Weather Service",
   },
-  { name: "OurAirports", href: "https://ourairports.com/data/", role: "Airport codes, released into the public domain" },
+  {
+    name: "adsb.lol",
+    href: "https://adsb.lol/",
+    role: "Live aircraft positions, from a community network of receivers (ODbL)",
+  },
+  { name: "Planespotters.net", href: "https://www.planespotters.net/", role: "Aircraft photos, credited to each photographer" },
+  {
+    name: "OpenFreeMap",
+    href: "https://openfreemap.org/",
+    role: "Map tiles, with map data from OpenStreetMap contributors",
+  },
+  { name: "OurAirports", href: "https://ourairports.com/data/", role: "Airport codes and locations, released into the public domain" },
   { name: "Travelpayouts", href: "https://www.travelpayouts.com/", role: "Airline logo images" },
   {
     name: "Aceternity UI",
@@ -96,8 +107,9 @@ export default function About() {
             one call to the data source, which keeps the site inside its free limits.
           </Stop>
           <Stop code="SRC" title="The data sources" last>
-            Flights come from AviationStack, and weather from the Aviation Weather Center. Times
-            arrive as exact instants and are shown in each airport's own time zone.
+            Flights come from AviationStack, weather from the Aviation Weather Center, and live
+            positions of planes in the air from adsb.lol. Times arrive as exact instants and are
+            shown in each airport's own time zone.
           </Stop>
         </ol>
       </section>

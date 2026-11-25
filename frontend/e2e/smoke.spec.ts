@@ -159,3 +159,39 @@ test("looking up a flight number shows that flight", async ({ page }) => {
   await expect(flightRow(page, "BA178")).toContainText("British Airways");
   await expect(flightRow(page, "BA178")).toContainText(/cancelled/i);
 });
+
+test("an airborne flight opened from the board shows its live position", async ({ page }) => {
+  // Keep the run offline: map tiles and aircraft photos come from third
+  // parties, and the cockpit has to cope without them anyway.
+  await page.route(/tiles\.openfreemap\.org|api\.planespotters\.net|pics\.avs\.io/, (route) =>
+    route.abort(),
+  );
+  await searchAirport(page, "JFK");
+  await expectFlights(page, JFK_DEPARTURES);
+
+  await flightRow(page, "DL402").click();
+  const live = page.getByRole("dialog").getByRole("region", { name: "Live position" });
+  await expect(live).toContainText("34,975 ft");
+  await expect(live).toContainText("Airbus A350-900, N528DN");
+
+  // A flight on the ground isn't looked up at all.
+  await page.keyboard.press("Escape");
+  await flightRow(page, "UA15").click();
+  await expect(
+    page.getByRole("dialog").getByRole("region", { name: "Live position" }),
+  ).toContainText("has landed");
+});
+
+test("an active flight with no aircraft broadcasting says so", async ({ page }) => {
+  await page.route(/tiles\.openfreemap\.org|api\.planespotters\.net|pics\.avs\.io/, (route) =>
+    route.abort(),
+  );
+  await searchAirport(page, "JFK");
+  await page.getByRole("button", { name: "Arrivals" }).click();
+  await expectFlights(page, JFK_ARRIVALS);
+
+  await flightRow(page, "AF22").click();
+  await expect(
+    page.getByRole("dialog").getByRole("region", { name: "Live position" }),
+  ).toContainText("No aircraft is broadcasting AFR22");
+});

@@ -3,6 +3,8 @@ import { MotionConfig, motion, useReducedMotion, useSpring, useTransform } from 
 import { useEffect, type ReactNode } from "react";
 
 import { AirlineLogo } from "@/components/flights/AirlineLogo";
+import { Instrument, Readout } from "@/components/flights/Instrument";
+import { LivePosition } from "@/components/flights/LivePosition";
 import { useNow } from "@/hooks/useNow";
 import { useWeather } from "@/hooks/useWeather";
 import { ApiError } from "@/lib/api";
@@ -41,33 +43,6 @@ const TONE_LIT: Record<StatusTone, string> = {
   alert: "border-board-red/60 bg-board-red/15 text-board-red",
   neutral: "border-board-ink/40 bg-board-ink/10 text-board-ink",
 };
-
-/** A framed instrument with its name in the corner. */
-function Instrument({
-  label,
-  aside,
-  className,
-  children,
-}: {
-  label: string;
-  /** Shown at the right of the instrument's name, e.g. a badge. */
-  aside?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      aria-label={label}
-      className={cn("rounded-lg border border-board-line bg-board-raised/50 p-4 sm:p-5", className)}
-    >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-xs text-board-muted">{label}</h3>
-        {aside}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 // ── Route ────────────────────────────────────────────────────────────
 
@@ -307,15 +282,6 @@ function DelayGauge({ flight }: { flight: Flight }) {
 
 // ── Readouts ─────────────────────────────────────────────────────────
 
-function Readout({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0 overflow-hidden rounded-md bg-black/30 px-3 py-2.5 shadow-[inset_0_1px_3px_rgb(0_0_0/0.5)]">
-      <dt className="text-xs text-board-muted">{label}</dt>
-      <dd className="mt-0.5 font-mono text-[15px] text-board-ink">{children}</dd>
-    </div>
-  );
-}
-
 function TimeValue({ value, flight, now }: { value: string | null; flight: Flight; now: number }) {
   const label = formatFlightTime(value, flight.timezone, { now });
   if (!label || !value) return <span className="text-board-muted">—</span>;
@@ -494,6 +460,7 @@ export function FlightCockpit({ flight, leg = "departure", action }: FlightCockp
         <StatusAnnunciator status={flight.status} />
         <DelayGauge flight={flight} />
         <Readouts flight={flight} leg={leg} />
+        <LivePosition flight={flight} />
         <WeatherInstrument airport={flight.origin.iata} />
         <WeatherInstrument airport={flight.destination.iata} />
       </div>
