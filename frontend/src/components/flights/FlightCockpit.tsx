@@ -309,7 +309,7 @@ function DelayGauge({ flight }: { flight: Flight }) {
 
 function Readout({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-md bg-black/30 px-3 py-2.5 shadow-[inset_0_1px_3px_rgb(0_0_0/0.5)]">
+    <div className="min-w-0 overflow-hidden rounded-md bg-black/30 px-3 py-2.5 shadow-[inset_0_1px_3px_rgb(0_0_0/0.5)]">
       <dt className="text-xs text-board-muted">{label}</dt>
       <dd className="mt-0.5 font-mono text-[15px] text-board-ink">{children}</dd>
     </div>
@@ -324,7 +324,8 @@ function TimeValue({ value, flight, now }: { value: string | null; flight: Fligh
       <time dateTime={value} className="whitespace-nowrap">
         {label.time}
       </time>
-      {label.date && <span className="ml-1.5 text-xs whitespace-nowrap text-board-muted">{label.date}</span>}
+      {/* Its own line, like on the board: beside the time it overflows the readout. */}
+      {label.date && <span className="block text-xs text-board-muted">{label.date}</span>}
     </>
   );
 }
