@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Airports report about hourly, so ten minutes of caching loses little.
     aviationweather_base_url: str = "https://aviationweather.gov/api/data"
     weather_cache_ttl_seconds: int = Field(default=600, ge=1)
+    # Live aircraft positions from adsb.lol: free, with no key, but a few
+    # hundred requests a day for the whole app, so viewers share lookups.
+    adsblol_base_url: str = "https://api.adsb.lol/v2"
+    position_cache_ttl_seconds: int = Field(default=60, ge=1)
 
     @model_validator(mode="after")
     def _require_api_key_for_selected_provider(self) -> Self:

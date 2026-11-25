@@ -168,3 +168,22 @@
     animation-delay: calc(var(--row, 0) * 45ms + 180ms);
   }
 }
+
+/*
+ * MapLibre's attribution control, recoloured for the dark board. The credits
+ * themselves (OpenFreeMap, OpenMapTiles, OpenStreetMap) must stay visible.
+ * Scoped under .maplibregl-map to outrank MapLibre's own stylesheet, which
+ * loads later with the map.
+ */
+.maplibregl-map .maplibregl-ctrl.maplibregl-ctrl-attrib,
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact,
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact-show {
+  background-color: rgb(21 24 29 / 0.85);
+  color: var(--board-muted);
+}
+.maplibregl-map .maplibregl-ctrl-attrib a {
+  color: var(--board-ink);
+}
+.maplibregl-map .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}

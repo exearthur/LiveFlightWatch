@@ -7,9 +7,28 @@ import type {
   Flight,
   FlightDirection,
   FlightLookupResponse,
+  AirportLocation,
+  AirportsResponse,
   FlightsResponse,
+  PositionResponse,
   WeatherResponse,
 } from "@/types/flight";
+
+// ICAO designators for the airlines below, for each flight's radio callsign.
+const AIRLINE_ICAO: Record<string, string> = {
+  AA: "AAL",
+  DL: "DAL",
+  BA: "BAW",
+  UA: "UAL",
+  VS: "VIR",
+  AF: "AFR",
+  B6: "JBU",
+};
+
+function callsignFor(flightNumber: string): string | null {
+  const icao = AIRLINE_ICAO[flightNumber.slice(0, 2)];
+  return icao ? `${icao}${flightNumber.slice(2)}` : null;
+}
 
 const JFK: Airport = { iata: "JFK", name: "John F Kennedy International" };
 const LHR: Airport = { iata: "LHR", name: "London Heathrow" };
@@ -37,6 +56,7 @@ function flight(
     gate: "B22",
     // Every board here is JFK's, so its times are shown in New York time.
     timezone: "America/New_York",
+    callsign: callsignFor(overrides.flight_number),
     ...overrides,
   };
 }
@@ -200,5 +220,51 @@ export function weatherResponse(airport: string): WeatherResponse {
       altimeter_hpa: 1020,
       clouds: [{ cover: "FEW", base_ft: 4000 }],
     },
+  };
+}
+
+const AIRPORT_LOCATIONS: Record<string, AirportLocation> = {
+  JFK: { iata: "JFK", icao: "KJFK", name: "John F. Kennedy International Airport", lat: 40.6394, lon: -73.7793 },
+  LHR: { iata: "LHR", icao: "EGLL", name: "London Heathrow Airport", lat: 51.4706, lon: -0.4619 },
+  LAX: { iata: "LAX", icao: "KLAX", name: "Los Angeles International Airport", lat: 33.9425, lon: -118.4081 },
+  ATL: { iata: "ATL", icao: "KATL", name: "Hartsfield-Jackson Atlanta International Airport", lat: 33.6367, lon: -84.4281 },
+  CDG: { iata: "CDG", icao: "LFPG", name: "Charles de Gaulle International Airport", lat: 49.0128, lon: 2.55 },
+  SFO: { iata: "SFO", icao: "KSFO", name: "San Francisco International Airport", lat: 37.619, lon: -122.3749 },
+};
+
+/** `GET /api/airports?codes=`: the known codes among those asked for. */
+export function airportsResponse(codes: string[]): AirportsResponse {
+  return {
+    airports: [...new Set(codes)].flatMap((code) => AIRPORT_LOCATIONS[code] ?? []),
+  };
+}
+
+/**
+ * `GET /api/position?callsign=`. DL402 (JFK to Atlanta) is in the air over
+ * Virginia. AF22 is also active, but out of receiver range, so nothing is
+ * transmitting it; everything else is on the ground.
+ */
+export function positionResponse(callsign: string): PositionResponse {
+  return {
+    callsign,
+    fetched_at: new Date().toISOString(),
+    cached: false,
+    aircraft:
+      callsign === "DAL402"
+        ? {
+            hex: "a6a6fe",
+            callsign,
+            registration: "N528DN",
+            type_code: "A359",
+            type_name: "Airbus A350-900",
+            lat: 37.35,
+            lon: -78.6,
+            altitude_ft: 34975,
+            on_ground: false,
+            ground_speed_kt: 452,
+            track_deg: 214,
+            position_age_s: 0.4,
+          }
+        : null,
   };
 }

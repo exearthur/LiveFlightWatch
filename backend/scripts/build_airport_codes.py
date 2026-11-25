@@ -1,7 +1,9 @@
-"""Builds app/data/airport_icao_codes.json, the IATA -> ICAO airport table.
+"""Builds app/data/airports.json: for each IATA airport code, its ICAO code,
+name and position, as [icao, name, latitude, longitude].
 
-The weather service needs it because aviationweather.gov only accepts ICAO
-station codes (KJFK), while the rest of the app uses IATA codes (JFK).
+The weather service needs the ICAO code because aviationweather.gov only
+accepts ICAO station codes (KJFK), while the rest of the app uses IATA codes
+(JFK). The live map needs the position to draw a flight's route.
 
 Source: OurAirports (https://ourairports.com/data/), released into the public
 domain. Run from backend/ to refresh the table:
@@ -19,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 SOURCE_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
-OUTPUT = Path(__file__).resolve().parent.parent / "app" / "data" / "airport_icao_codes.json"
+OUTPUT = Path(__file__).resolve().parent.parent / "app" / "data" / "airports.json"
 
 IATA = re.compile(r"^[A-Z]{3}$")
 ICAO = re.compile(r"^[A-Z]{4}$")
@@ -44,18 +46,28 @@ def icao_for(row: dict[str, str]) -> str | None:
     return None
 
 
-def build(rows: list[dict[str, str]]) -> dict[str, str]:
-    table: dict[str, str] = {}
+def coordinate(value: str | None) -> float | None:
+    try:
+        return round(float(value or ""), 4)
+    except ValueError:
+        return None
+
+
+def build(rows: list[dict[str, str]]) -> dict[str, list[str | float]]:
+    table: dict[str, list[str | float]] = {}
     for row in rows:
         iata = (row.get("iata_code") or "").strip().upper()
         icao = icao_for(row)
-        if IATA.match(iata) and icao:
-            table[iata] = icao
+        lat = coordinate(row.get("latitude_deg"))
+        lon = coordinate(row.get("longitude_deg"))
+        if IATA.match(iata) and icao and lat is not None and lon is not None:
+            table[iata] = [icao, (row.get("name") or "").strip(), lat, lon]
     return dict(sorted(table.items()))
 
 
 def main() -> None:
     table = build(read_rows(sys.argv[1] if len(sys.argv) > 1 else None))
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(json.dumps(table, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"Wrote {len(table)} airports to {OUTPUT}")
 

@@ -32,6 +32,11 @@ export interface Flight {
    * the provider does not say, and absent from responses older than the field.
    */
   timezone?: string | null;
+  /**
+   * The radio callsign ("DAL27"), which live-position lookups key on. For a
+   * codeshare it is the operating flight's. Null or absent when unknown.
+   */
+  callsign?: string | null;
 }
 
 export interface FlightsResponse {
@@ -83,4 +88,43 @@ export interface WeatherResponse {
   fetched_at: string;
   cached: boolean;
   weather: Weather;
+}
+
+/** An aircraft's latest ADS-B report. */
+export interface Aircraft {
+  /** 24-bit ICAO transponder address, six hex digits. */
+  hex: string;
+  callsign: string;
+  registration: string | null;
+  /** ICAO type designator, e.g. "B38M". */
+  type_code: string | null;
+  type_name: string | null;
+  lat: number;
+  lon: number;
+  altitude_ft: number | null;
+  on_ground: boolean;
+  ground_speed_kt: number | null;
+  /** Direction of travel over the ground, degrees true. */
+  track_deg: number | null;
+  position_age_s: number | null;
+}
+
+export interface PositionResponse {
+  callsign: string;
+  fetched_at: string;
+  cached: boolean;
+  /** Null when nothing is transmitting the callsign right now. */
+  aircraft: Aircraft | null;
+}
+
+export interface AirportLocation {
+  iata: string;
+  icao: string;
+  name: string | null;
+  lat: number;
+  lon: number;
+}
+
+export interface AirportsResponse {
+  airports: AirportLocation[];
 }

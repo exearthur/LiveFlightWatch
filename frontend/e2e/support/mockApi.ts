@@ -6,6 +6,8 @@ import {
   flightsResponse,
   INVALID_REQUEST_BODY,
   NOT_FOUND_BODY,
+  airportsResponse,
+  positionResponse,
   RATE_LIMITED_BODY,
   weatherResponse,
 } from "../fixtures/flights";
@@ -13,6 +15,7 @@ import {
 // The same query validation the FastAPI routes apply (backend/app/routers/flights.py).
 const AIRPORT_PATTERN = /^[A-Za-z]{3}$/;
 const FLIGHT_NUMBER_PATTERN = /^[A-Za-z]{2,3}[0-9]{1,4}[A-Za-z]?$/;
+const CALLSIGN_PATTERN = /^[A-Za-z]{3}[0-9]{1,4}[A-Za-z]{0,2}$/;
 
 export interface MockApi {
   /** Path and query of every request the app sent to the API, in order. */
@@ -80,6 +83,27 @@ export async function installMockApi(page: Page): Promise<MockApi> {
         if (AIRPORT_PATTERN.test(airport)) {
           return json(route, 200, weatherResponse(airport.toUpperCase()));
         }
+        unexpectedRequests.push(summary);
+        return json(route, 422, INVALID_REQUEST_BODY);
+      }
+
+      // Live positions and airport locations also come from free sources
+      // the flight quota doesn't cover.
+      if (request.method() === "GET" && url.pathname === "/api/position") {
+        const callsign = url.searchParams.get("callsign") ?? "";
+        if (CALLSIGN_PATTERN.test(callsign)) {
+          return json(route, 200, positionResponse(callsign.toUpperCase()));
+        }
+        unexpectedRequests.push(summary);
+        return json(route, 422, INVALID_REQUEST_BODY);
+      }
+
+      if (request.method() === "GET" && url.pathname === "/api/airports") {
+        const codes = (url.searchParams.get("codes") ?? "")
+          .split(",")
+          .map((code) => code.trim().toUpperCase())
+          .filter(Boolean);
+        if (codes.length > 0 && codes.length <= 10) return json(route, 200, airportsResponse(codes));
         unexpectedRequests.push(summary);
         return json(route, 422, INVALID_REQUEST_BODY);
       }

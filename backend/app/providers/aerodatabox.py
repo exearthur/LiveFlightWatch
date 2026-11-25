@@ -292,6 +292,8 @@ class AeroDataBoxProvider(FlightProvider):
         # the rest of the app, and the lookup endpoint's own validation, use
         # the compact form.
         flight_number = "".join((_text(raw.get("number")) or "").split()) or "Unknown"
+        # The radio callsign ("DAL27"), which live-position services key on.
+        call_sign = _text(raw.get("callSign"))
 
         return Flight(
             flight_number=flight_number,
@@ -305,4 +307,5 @@ class AeroDataBoxProvider(FlightProvider):
             terminal=_text(leg.get("terminal")),
             gate=_text(leg.get("gate")),
             timezone=display_zone,
+            callsign=call_sign.upper() if call_sign else None,
         )

@@ -2,6 +2,8 @@ import type {
   FlightDirection,
   FlightLookupResponse,
   FlightsResponse,
+  AirportsResponse,
+  PositionResponse,
   WeatherResponse,
 } from "@/types/flight";
 
@@ -65,4 +67,26 @@ export async function getWeather(airport: string): Promise<WeatherResponse> {
   }
 
   return response.json();
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(
+      body?.detail ?? `Request failed with status ${response.status}`,
+      response.status,
+    );
+  }
+  return response.json();
+}
+
+/** The aircraft transmitting a callsign right now, if any. */
+export function getPosition(callsign: string): Promise<PositionResponse> {
+  return getJson(`/api/position?callsign=${encodeURIComponent(callsign)}`);
+}
+
+/** Name and position of each known airport among `codes`; unknown codes are left out. */
+export function getAirports(codes: string[]): Promise<AirportsResponse> {
+  return getJson(`/api/airports?codes=${encodeURIComponent(codes.join(","))}`);
 }
