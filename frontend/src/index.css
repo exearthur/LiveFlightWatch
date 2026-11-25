@@ -1,69 +1,94 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/martian-mono";
+@import "@fontsource-variable/atkinson-hyperlegible-next";
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Design tokens.
+ *
+ * The page sits on a cool "terminal wall" grey and follows the light/dark
+ * theme. The flight board is a physical display, so its tokens (--board-*)
+ * stay dark in both themes, the way a departures screen is dark whatever the
+ * lighting in the hall. Amber is the only accent, taken from split-flap and
+ * LED airport signage.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --primary: var(--color-sky-600);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --accent: var(--color-sky-50);
-  --accent-foreground: var(--color-sky-700);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: var(--color-sky-500);
+  --radius: 0.5rem;
+
+  --background: #e6e9ed;
+  --surface: #f5f6f8;
+  --foreground: #1a1e24;
+  --muted-foreground: #4e5764;
+  --border: #c9ced6;
+  --input: #b9c0ca;
+
+  --primary: #f5b83d;
+  --primary-foreground: #1a1e24;
+  --secondary: #d9dde3;
+  --secondary-foreground: #1a1e24;
+  --accent: #dde1e7;
+  --accent-foreground: #1a1e24;
+  --destructive: #c4313a;
+  --ring: #d18f0f;
+
+  /* The board: identical in both themes. */
+  --board: #15181d;
+  --board-raised: #1d2128;
+  --board-line: #2a2f37;
+  --board-ink: #eceef1;
+  --board-muted: #8b94a1;
+  --board-amber: #f5b83d;
+  --board-green: #4cc38a;
+  --board-red: #ef5b61;
 }
 
 /*
- * Falls back to the OS preference only when the user hasn't made an
- * explicit choice (the `.light` class below is applied whenever they
- * have chosen light mode explicitly, even if the OS prefers dark).
+ * Falls back to the OS preference only when the user hasn't made an explicit
+ * choice (`.light` is set whenever they have chosen light mode explicitly).
  */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --primary: var(--color-sky-500);
-    --primary-foreground: oklch(0.145 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --accent: var(--color-sky-950);
-    --accent-foreground: var(--color-sky-300);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: var(--color-sky-500);
+    --background: #0e1013;
+    --surface: #171a1f;
+    --foreground: #e8eaed;
+    --muted-foreground: #9aa3ae;
+    --border: #262b33;
+    --input: #323843;
+    --secondary: #20242b;
+    --secondary-foreground: #e8eaed;
+    --accent: #20242b;
+    --accent-foreground: #e8eaed;
+    --destructive: #ef5b61;
+    --ring: #f5b83d;
   }
 }
 
-/*
- * Explicit override applied via the manual dark-mode toggle (see
- * `useTheme`/`ThemeToggle`). Higher specificity than the bare `:root`
- * selectors above, so it always wins regardless of OS preference.
- */
+/* Explicit override from the manual theme toggle (see useTheme). */
 :root.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --primary: var(--color-sky-500);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --accent: var(--color-sky-950);
-  --accent-foreground: var(--color-sky-300);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: var(--color-sky-500);
+  --background: #0e1013;
+  --surface: #171a1f;
+  --foreground: #e8eaed;
+  --muted-foreground: #9aa3ae;
+  --border: #262b33;
+  --input: #323843;
+  --secondary: #20242b;
+  --secondary-foreground: #e8eaed;
+  --accent: #20242b;
+  --accent-foreground: #e8eaed;
+  --destructive: #ef5b61;
+  --ring: #f5b83d;
 }
 
 @theme inline {
+  --font-sans: "Atkinson Hyperlegible Next Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Martian Mono Variable", ui-monospace, monospace;
+
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -74,6 +99,16 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-board: var(--board);
+  --color-board-raised: var(--board-raised);
+  --color-board-line: var(--board-line);
+  --color-board-ink: var(--board-ink);
+  --color-board-muted: var(--board-muted);
+  --color-board-amber: var(--board-amber);
+  --color-board-green: var(--board-green);
+  --color-board-red: var(--board-red);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -84,7 +119,52 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not(.light) {
+      color-scheme: dark;
+    }
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground antialiased;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  /* Times and counts line up in columns on the board. */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Rows cascade onto the board once, when a new board loads (see FlightsTable).
+ * A row's position in the cascade comes from --row, capped by the component so
+ * a long board doesn't keep animating for seconds.
+ */
+@keyframes board-row-in {
+  from {
+    opacity: 0;
+    transform: perspective(600px) rotateX(-70deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .board-row-in {
+    transform-origin: top center;
+    animation: board-row-in 420ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+    animation-delay: calc(var(--row, 0) * 45ms + 180ms);
   }
 }

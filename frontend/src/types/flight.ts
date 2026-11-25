@@ -48,3 +48,39 @@ export interface FlightLookupResponse {
   cached: boolean;
   flights: Flight[];
 }
+
+/** Flight rules from ceiling and visibility: visual, marginal visual, instrument, low instrument. */
+export type FlightCategory = "VFR" | "MVFR" | "IFR" | "LIFR";
+
+export interface CloudLayer {
+  /** METAR cover code: FEW, SCT, BKN, OVC, or CLR/SKC/NSC/CAVOK for clear. */
+  cover: string;
+  base_ft: number | null;
+}
+
+/** A decoded METAR. Fields the report leaves out are null. */
+export interface Weather {
+  station: string;
+  station_name: string | null;
+  observed_at: string;
+  raw: string;
+  flight_category: FlightCategory | null;
+  temperature_c: number | null;
+  dewpoint_c: number | null;
+  /** Direction the wind blows from, degrees true; null when calm or variable. */
+  wind_direction_deg: number | null;
+  wind_variable: boolean;
+  wind_speed_kt: number | null;
+  wind_gust_kt: number | null;
+  /** Statute miles as reported; "10+" means ten or more. */
+  visibility_sm: string | null;
+  altimeter_hpa: number | null;
+  clouds: CloudLayer[];
+}
+
+export interface WeatherResponse {
+  airport: string;
+  fetched_at: string;
+  cached: boolean;
+  weather: Weather;
+}

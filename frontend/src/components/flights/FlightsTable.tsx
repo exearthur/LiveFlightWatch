@@ -1,44 +1,32 @@
-import { Plane } from "lucide-react";
+import { IconPlaneTilt } from "@tabler/icons-react";
+import type { CSSProperties } from "react";
 
+import { AirlineLogo } from "@/components/flights/AirlineLogo";
 import { useNow } from "@/hooks/useNow";
+import { STATUS_TONE, type StatusTone } from "@/lib/flightStatus";
 import { formatFlightTime } from "@/lib/flightTime";
 import { cn } from "@/lib/utils";
 import type { Flight, FlightStatus } from "@/types/flight";
 
-const STATUS_STYLES: Record<FlightStatus, { badge: string; dot: string }> = {
-  scheduled: {
-    badge: "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300",
-    dot: "bg-neutral-400",
-  },
-  active: {
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    dot: "bg-emerald-500",
-  },
-  landed: {
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    dot: "bg-emerald-500",
-  },
-  delayed: {
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-    dot: "bg-amber-500",
-  },
-  cancelled: {
-    badge: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-    dot: "bg-red-500",
-  },
-  diverted: {
-    badge: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-    dot: "bg-red-500",
-  },
-  unknown: {
-    badge: "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400",
-    dot: "bg-neutral-400",
-  },
+const TONE_TEXT: Record<StatusTone, string> = {
+  ok: "text-board-green",
+  warn: "text-board-amber",
+  alert: "text-board-red",
+  neutral: "text-board-muted",
 };
 
 // How often the table re-checks which date is "today", so the date shown
 // beside a time on another day stays right across midnight.
 const DAY_CHECK_INTERVAL_MS = 60_000;
+
+// Rows past this point appear without the cascade, so a 300-row board doesn't
+// keep animating for seconds after it loads.
+const CASCADE_ROWS = 14;
+
+function cascade(index: number): { className?: string; style?: CSSProperties } {
+  if (index >= CASCADE_ROWS) return {};
+  return { className: "board-row-in", style: { "--row": index } as CSSProperties };
+}
 
 /**
  * One time in the airport's own zone with its zone label ("10:45 PM EST"),
@@ -55,30 +43,29 @@ function FlightTime({
   now: number;
 }) {
   const label = formatFlightTime(value, timeZone, { now });
-  if (!label || !value) return <>—</>;
+  if (!label || !value) return <span className="text-board-muted">—</span>;
   return (
     <>
       <time dateTime={value}>{label.time}</time>
-      {label.date && (
-        <span className="block text-xs text-neutral-400 dark:text-neutral-500">{label.date}</span>
-      )}
+      {label.date && <span className="block text-xs text-board-muted">{label.date}</span>}
     </>
   );
 }
 
-function StatusBadge({ status }: { status: FlightStatus }) {
-  const style = STATUS_STYLES[status];
+function StatusLabel({ status }: { status: FlightStatus }) {
+  const tone = STATUS_TONE[status];
   return (
     <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
-        style.badge,
-      )}
+      data-tone={tone}
+      className={cn("font-mono text-xs font-semibold tracking-wide uppercase", TONE_TEXT[tone])}
     >
-      <span className={cn("size-1.5 rounded-full", style.dot)} />
       {status}
     </span>
   );
+}
+
+function gateLabel(flight: Flight): string {
+  return [flight.terminal, flight.gate].filter(Boolean).join(" / ") || "—";
 }
 
 interface FlightsTableProps {
@@ -86,25 +73,69 @@ interface FlightsTableProps {
   direction: "departures" | "arrivals";
   emptyTitle?: string;
   emptyDescription?: string;
+  /**
+   * Makes each row pick its flight: clicking the row, or its flight number
+   * (a button, for keyboard users). The board uses it to open a flight in the
+   * cockpit; the lookup to choose which match the cockpit shows, with
+   * `selectedIndex` highlighting the current one.
+   */
+  selection?: {
+    selectedIndex?: number;
+    onSelect: (index: number) => void;
+    /** Tooltip for the flight-number button, e.g. "Open in the cockpit". */
+    hint?: string;
+  };
 }
 
+function FlightNumber({
+  flight,
+  index,
+  selection,
+}: {
+  flight: Flight;
+  index: number;
+  selection: FlightsTableProps["selection"];
+}) {
+  if (!selection) return <>{flight.flight_number}</>;
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        // The row handles clicks too; don't pick the flight twice.
+        event.stopPropagation();
+        selection.onSelect(index);
+      }}
+      aria-pressed={selection.selectedIndex === undefined ? undefined : selection.selectedIndex === index}
+      title={selection.hint}
+      className="rounded-sm underline-offset-4 hover:underline"
+    >
+      {flight.flight_number}
+    </button>
+  );
+}
+
+/**
+ * The board itself. Rendered inside the dark board panel, so it uses the
+ * board-* colours in both themes. Desktop gets a real table; narrow screens
+ * get one compact block per flight. Both are in the DOM and swapped by CSS.
+ */
 export function FlightsTable({
   flights,
   direction,
   emptyTitle,
   emptyDescription,
+  selection,
 }: FlightsTableProps) {
   const now = useNow(DAY_CHECK_INTERVAL_MS);
+  const placeLabel = direction === "departures" ? "Destination" : "Origin";
 
   if (flights.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-300 py-16 text-center dark:border-neutral-700">
-        <Plane className="size-8 -rotate-45 text-neutral-400 dark:text-neutral-600" />
+      <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+        <IconPlaneTilt className="size-8 text-board-muted" stroke={1.5} aria-hidden="true" />
         <div>
-          <p className="font-medium text-neutral-700 dark:text-neutral-300">
-            {emptyTitle ?? `No ${direction} found`}
-          </p>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="font-semibold text-board-ink">{emptyTitle ?? `No ${direction} found`}</p>
+          <p className="mt-1 text-sm text-board-muted">
             {emptyDescription ?? "Try a different airport code or switch direction."}
           </p>
         </div>
@@ -114,114 +145,117 @@ export function FlightsTable({
 
   return (
     <>
-      <div className="hidden overflow-hidden rounded-xl border border-neutral-200 shadow-sm md:block dark:border-neutral-800">
-        <div className="max-h-[70vh] overflow-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
-              <tr>
-                <th className="px-4 py-3 font-medium">Flight</th>
-                <th className="px-4 py-3 font-medium">Airline</th>
-                <th className="px-4 py-3 font-medium">
-                  {direction === "departures" ? "Destination" : "Origin"}
-                </th>
-                <th className="px-4 py-3 font-medium">Scheduled</th>
-                <th className="px-4 py-3 font-medium">Estimated</th>
-                <th className="px-4 py-3 font-medium">Terminal / Gate</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
-              {flights.map((flight, idx) => {
-                const other = direction === "departures" ? flight.destination : flight.origin;
-                return (
-                  <tr
-                    key={`${flight.flight_number}-${idx}`}
-                    className="odd:bg-white even:bg-neutral-50/60 hover:bg-sky-50 dark:odd:bg-neutral-950 dark:even:bg-neutral-900/40 dark:hover:bg-sky-950/30"
-                  >
-                    <td className="px-4 py-3 font-medium text-neutral-900 dark:text-neutral-100">
-                      {flight.flight_number}
-                    </td>
-                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                      {flight.airline ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                      {other.name ?? (other.iata || "—")}
-                    </td>
-                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                      <FlightTime value={flight.scheduled_time} timeZone={flight.timezone} now={now} />
-                    </td>
-                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                      <FlightTime value={flight.estimated_time} timeZone={flight.timezone} now={now} />
-                    </td>
-                    <td className="px-4 py-3 text-neutral-600 dark:text-neutral-300">
-                      {[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={flight.status} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <div className="hidden max-h-[70vh] overflow-auto md:block">
+        <table className="w-full text-left text-[15px]">
+          <thead className="sticky top-0 z-10 bg-board text-xs text-board-muted">
+            <tr className="border-b border-board-line whitespace-nowrap">
+              <th className="py-3 pr-4 pl-6 font-normal">Scheduled</th>
+              <th className="px-4 py-3 font-normal">Flight</th>
+              <th className="px-4 py-3 font-normal">{placeLabel}</th>
+              <th className="px-4 py-3 font-normal">Airline</th>
+              <th className="px-4 py-3 font-normal">Expected</th>
+              <th className="px-4 py-3 font-normal">Terminal / Gate</th>
+              <th className="py-3 pr-6 pl-4 font-normal">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-board-line/70">
+            {flights.map((flight, idx) => {
+              const other = direction === "departures" ? flight.destination : flight.origin;
+              const { className, style } = cascade(idx);
+              return (
+                <tr
+                  key={`${flight.flight_number}-${idx}`}
+                  className={cn(
+                    "transition-colors hover:bg-white/[0.03]",
+                    selection && "cursor-pointer",
+                    selection?.selectedIndex === idx && "bg-white/[0.05]",
+                    className,
+                  )}
+                  style={style}
+                  onClick={selection ? () => selection.onSelect(idx) : undefined}
+                >
+                  <td className="py-3 pr-4 pl-6 align-top font-mono text-[13px] whitespace-nowrap text-board-ink">
+                    <FlightTime value={flight.scheduled_time} timeZone={flight.timezone} now={now} />
+                  </td>
+                  <td className="px-4 py-3 align-top font-mono text-[13px] font-semibold text-board-amber">
+                    <FlightNumber flight={flight} index={idx} selection={selection} />
+                  </td>
+                  <td className="px-4 py-3 align-top font-semibold text-board-ink">
+                    {other.name ?? (other.iata || "—")}
+                  </td>
+                  <td className="px-4 py-3 align-top text-sm text-board-muted">
+                    <span className="flex items-center gap-3 whitespace-nowrap">
+                      <AirlineLogo flightNumber={flight.flight_number} airline={flight.airline} />
+                      <span>{flight.airline ?? "—"}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 align-top font-mono text-[13px] whitespace-nowrap text-board-ink">
+                    <FlightTime value={flight.estimated_time} timeZone={flight.timezone} now={now} />
+                  </td>
+                  <td className="px-4 py-3 align-top font-mono text-[13px] whitespace-nowrap text-board-ink">
+                    {gateLabel(flight)}
+                  </td>
+                  <td className="py-3 pr-6 pl-4 align-top">
+                    <StatusLabel status={flight.status} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      <div className="max-h-[70vh] space-y-3 overflow-auto md:hidden">
+      <ul className="max-h-[70vh] divide-y divide-board-line/70 overflow-auto md:hidden">
         {flights.map((flight, idx) => {
           const other = direction === "departures" ? flight.destination : flight.origin;
+          const { className, style } = cascade(idx);
           return (
-            <div
+            <li
               key={`${flight.flight_number}-${idx}`}
-              className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
+              className={cn(
+                "px-4 py-4",
+                selection && "cursor-pointer",
+                selection?.selectedIndex === idx && "bg-white/[0.05]",
+                className,
+              )}
+              style={style}
+              onClick={selection ? () => selection.onSelect(idx) : undefined}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                    {flight.flight_number}
-                  </p>
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                    {flight.airline ?? "—"}
-                  </p>
-                </div>
-                <StatusBadge status={flight.status} />
-              </div>
-
-              <div className="mt-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-                <p className="text-xs text-neutral-400 dark:text-neutral-500">
-                  {direction === "departures" ? "Destination" : "Origin"}
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="font-mono font-semibold text-board-amber">
+                  <FlightNumber flight={flight} index={idx} selection={selection} />
                 </p>
-                <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                  {other.name ?? (other.iata || "—")}
-                </p>
+                <StatusLabel status={flight.status} />
               </div>
+              <p className="mt-1 text-xs text-board-muted">{placeLabel}</p>
+              <p className="font-semibold text-board-ink">{other.name ?? (other.iata || "—")}</p>
+              <p className="mt-1 flex items-center gap-2 text-sm text-board-muted">
+                <AirlineLogo flightNumber={flight.flight_number} airline={flight.airline} className="w-12" />
+                <span>{flight.airline ?? "—"}</span>
+              </p>
 
-              <div className="mt-3 grid grid-cols-3 gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+              <dl className="mt-3 grid grid-cols-3 gap-3 font-mono text-sm text-board-ink">
                 <div>
-                  <p className="text-xs text-neutral-400 dark:text-neutral-500">Scheduled</p>
-                  <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                  <dt className="font-sans text-xs text-board-muted">Scheduled</dt>
+                  <dd>
                     <FlightTime value={flight.scheduled_time} timeZone={flight.timezone} now={now} />
-                  </p>
+                  </dd>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-400 dark:text-neutral-500">Estimated</p>
-                  <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                  <dt className="font-sans text-xs text-board-muted">Expected</dt>
+                  <dd>
                     <FlightTime value={flight.estimated_time} timeZone={flight.timezone} now={now} />
-                  </p>
+                  </dd>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-400 dark:text-neutral-500">
-                    Terminal / Gate
-                  </p>
-                  <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                    {[flight.terminal, flight.gate].filter(Boolean).join(" / ") || "—"}
-                  </p>
+                  <dt className="font-sans text-xs text-board-muted">Terminal / Gate</dt>
+                  <dd>{gateLabel(flight)}</dd>
                 </div>
-              </div>
-            </div>
+              </dl>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </>
   );
 }

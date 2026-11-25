@@ -14,6 +14,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
     ...actual,
     getFlights: vi.fn(),
     getFlightByNumber: vi.fn(),
+    // Weather isn't under test here; answer "no report" so it stays out of the way.
+    getWeather: vi.fn(() => Promise.reject(new actual.ApiError("No report", 404))),
   };
 });
 
@@ -386,7 +388,7 @@ describe("Flights page — nearest-airport detection", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Location access was denied — enter an airport code below/),
+        screen.getByText(/Location access was denied\. Enter an airport code below/),
       ).toBeInTheDocument(),
     );
     expect(mockedGetFlights).not.toHaveBeenCalled();
@@ -438,5 +440,56 @@ describe("Flights page — nearest-airport detection", () => {
       ),
     );
     await waitFor(() => expect(mockedGetFlights).toHaveBeenLastCalledWith("ATL", "departures"));
+  });
+});
+
+describe("Flights page — opening a board flight", () => {
+  beforeEach(() => {
+    mockedGetFlights.mockReset();
+    mockedGetFlightByNumber.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("opens a clicked flight in the cockpit without looking it up again", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDepartures);
+    const user = userEvent.setup();
+    renderFlights("/?airport=JFK");
+
+    const [flightButton] = await screen.findAllByRole("button", { name: "AA100" });
+    await user.click(flightButton);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAccessibleName(/AA100/);
+    expect(dialog).toHaveTextContent("Delay");
+    // Drawn from the board's data: no lookup request.
+    expect(mockedGetFlightByNumber).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("saves the open flight to favorites", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDepartures);
+    const user = userEvent.setup();
+    renderFlights("/?airport=JFK&selected=AA100");
+
+    await user.click(await screen.findByRole("button", { name: "Save flight" }));
+
+    expect(screen.getByRole("button", { name: "Saved" })).toHaveAttribute("aria-pressed", "true");
+    expect(JSON.parse(localStorage.getItem("lfw:saved-flights") ?? "[]")).toMatchObject([
+      { flightNumber: "AA100" },
+    ]);
+  });
+
+  it("doesn't query a tab that isn't showing", async () => {
+    mockedGetFlights.mockResolvedValue(jfkDepartures);
+    renderFlights("/?airport=JFK&flight=AA100");
+
+    await waitFor(() => expect(mockedGetFlights).toHaveBeenCalled());
+    expect(mockedGetFlightByNumber).not.toHaveBeenCalled();
   });
 });

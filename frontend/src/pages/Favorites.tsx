@@ -1,8 +1,9 @@
-import { PlaneTakeoff, Star, X } from "lucide-react";
+import { IconArrowRight, IconX } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
 import { getFavoriteId, useFavorites, type Favorite } from "@/hooks/useFavorites";
+import { useSavedFlights, type SavedFlight } from "@/hooks/useSavedFlights";
+import { airlineCode, airlineLogoUrl } from "@/lib/airlines";
 import { ALL_AIRLINES, ALL_STATUSES } from "@/lib/flightFilters";
 
 function favoriteHref(favorite: Favorite): string {
@@ -25,61 +26,130 @@ function favoriteLabel(favorite: Favorite): string {
   return parts.join(" · ");
 }
 
+function savedFlightHref(flight: SavedFlight): string {
+  return `/?${new URLSearchParams({ mode: "flight", flight: flight.flightNumber }).toString()}`;
+}
+
+const rowClass =
+  "group flex items-center gap-4 rounded-lg border border-border bg-surface px-4 py-3 transition-colors hover:border-foreground/25";
+
+function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        // The button sits inside the row's link.
+        e.preventDefault();
+        e.stopPropagation();
+        onRemove();
+      }}
+      aria-label={label}
+      className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-foreground/[0.07] hover:text-foreground"
+    >
+      <IconX className="size-4" stroke={1.75} aria-hidden="true" />
+    </button>
+  );
+}
+
+/** The airline's logo in full colour on the light page, or nothing if it won't load. */
+function SavedFlightLogo({ flightNumber }: { flightNumber: string }) {
+  const code = airlineCode(flightNumber);
+  if (!code) return null;
+  return (
+    <img
+      src={airlineLogoUrl(code)}
+      alt=""
+      width={60}
+      height={20}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+      className="h-5 w-[60px] shrink-0 object-contain object-left dark:[filter:brightness(0)_invert(1)] dark:opacity-85"
+    />
+  );
+}
+
 export default function Favorites() {
   const { favorites, removeFavorite } = useFavorites();
+  const { savedFlights, removeFlight } = useSavedFlights();
+  const isEmpty = favorites.length === 0 && savedFlights.length === 0;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-8 flex items-center gap-3">
-        <span className="flex size-10 items-center justify-center rounded-lg bg-sky-600/10 text-sky-600 dark:text-sky-400">
-          <Star className="size-5 fill-current" />
-        </span>
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
-            Favorites
-          </h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Airport searches you've saved for quick access.
-          </p>
-        </div>
-      </div>
+    <main className="mx-auto max-w-3xl px-4 pt-8 pb-16 sm:pt-12">
+      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Favorites</h1>
+      <p className="mt-1 text-muted-foreground">
+        Boards and flights you've saved, kept in this browser.
+      </p>
 
-      {favorites.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-neutral-300 py-16 text-center text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-          <PlaneTakeoff className="size-8 text-neutral-400 dark:text-neutral-600" />
-          <p>No favorites yet — search for an airport and star it to save it here.</p>
-          <Button asChild>
-            <Link to="/">View Live Flights</Link>
-          </Button>
+      {isEmpty ? (
+        <div className="mt-10 rounded-xl border border-dashed border-input px-6 py-14 text-center">
+          <p className="font-semibold">No favorites yet</p>
+          <p className="mx-auto mt-1 max-w-[46ch] text-muted-foreground">
+            Star an airport board to keep its search, or open a flight and save it to follow it here.
+          </p>
+          <Link
+            to="/"
+            className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Find flights
+            <IconArrowRight className="size-4" stroke={2} aria-hidden="true" />
+          </Link>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {favorites.map((favorite) => (
-            <li key={getFavoriteId(favorite)}>
-              <Link
-                to={favoriteHref(favorite)}
-                className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50/50 px-4 py-3 transition-colors hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900/40 dark:hover:bg-neutral-800/60"
-              >
-                <span className="font-mono text-sm text-neutral-900 dark:text-neutral-100">
-                  {favoriteLabel(favorite)}
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    removeFavorite(favorite);
-                  }}
-                  aria-label={`Remove ${favoriteLabel(favorite)} from favorites`}
-                  className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
-                >
-                  <X className="size-4" />
-                </button>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-10 space-y-10">
+          {favorites.length > 0 && (
+            <section aria-labelledby="saved-boards">
+              <h2 id="saved-boards" className="mb-3 text-lg font-semibold">
+                Airport boards
+              </h2>
+              <ul className="flex flex-col gap-2">
+                {favorites.map((favorite) => (
+                  <li key={getFavoriteId(favorite)}>
+                    <Link to={favoriteHref(favorite)} className={rowClass}>
+                      <span className="rounded-[4px] bg-board px-2 py-1 font-mono text-sm font-semibold tracking-wider text-board-amber">
+                        {favorite.airport}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{favoriteLabel(favorite)}</span>
+                      <RemoveButton
+                        label={`Remove ${favoriteLabel(favorite)} from favorites`}
+                        onRemove={() => removeFavorite(favorite)}
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {savedFlights.length > 0 && (
+            <section aria-labelledby="saved-flights">
+              <h2 id="saved-flights" className="mb-3 text-lg font-semibold">
+                Flights
+              </h2>
+              <ul className="flex flex-col gap-2">
+                {savedFlights.map((flight) => (
+                  <li key={flight.flightNumber}>
+                    <Link to={savedFlightHref(flight)} className={rowClass}>
+                      <SavedFlightLogo flightNumber={flight.flightNumber} />
+                      <span className="w-20 shrink-0 font-mono text-sm font-semibold">
+                        {flight.flightNumber}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                        {[flight.origin, flight.destination].filter(Boolean).join(" to ")}
+                        {flight.airline && <span className="hidden sm:inline">, {flight.airline}</span>}
+                      </span>
+                      <RemoveButton
+                        label={`Remove ${flight.flightNumber} from favorites`}
+                        onRemove={() => removeFlight(flight.flightNumber)}
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
-    </div>
+    </main>
   );
 }

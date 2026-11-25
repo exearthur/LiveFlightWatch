@@ -1,66 +1,66 @@
-import { ExternalLink, Github, MessageSquare, MessagesSquare } from "lucide-react";
+import { IconArrowUpRight, IconBrandGithub, IconBug } from "@tabler/icons-react";
+import type { ComponentType } from "react";
 
-const REPO_URL = "https://github.com/exearthur/LiveFlightWatch";
+import { REPO_URL } from "@/lib/links";
 
-const LINKS = [
+const CHANNELS: {
+  icon: ComponentType<{ className?: string; stroke?: number; "aria-hidden"?: boolean }>;
+  title: string;
+  description: string;
+  href: string;
+}[] = [
   {
-    icon: Github,
-    title: "GitHub",
-    description: "Browse the source, star the repo, or send a pull request.",
-    href: REPO_URL,
+    icon: IconBug,
+    title: "Report a bug or suggest a feature",
+    description: "Open an issue on GitHub. Say what you searched and what you expected to see.",
+    href: `${REPO_URL}/issues/new`,
   },
   {
-    icon: MessagesSquare,
-    title: "Report an issue",
-    description: "Found a bug or have an idea for a feature? Open an issue on GitHub.",
-    href: `${REPO_URL}/issues`,
+    icon: IconBrandGithub,
+    title: "Browse the source",
+    description: "See how the board, the cockpit and the API are built, or send a pull request.",
+    href: REPO_URL,
   },
 ];
 
 export default function Contact() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-8 flex items-center gap-3">
-        <span className="flex size-10 items-center justify-center rounded-lg bg-sky-600/10 text-sky-600 dark:text-sky-400">
-          <MessageSquare className="size-5" />
-        </span>
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
-            Contact
-          </h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            Questions, bugs, or feedback — here's where to reach out.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {LINKS.map(({ icon: Icon, title, description, href }) => (
-          <a
-            key={title}
-            href={href}
-            target="_blank"
-            rel="noreferrer"
-            className="group flex flex-col gap-3 rounded-xl border border-neutral-200 p-4 transition-colors hover:border-sky-600/40 hover:bg-sky-600/5 dark:border-neutral-800 dark:hover:border-sky-400/40 dark:hover:bg-sky-400/5"
-          >
-            <span className="flex size-8 items-center justify-center rounded-lg bg-sky-600/10 text-sky-600 dark:text-sky-400">
-              <Icon className="size-4" />
-            </span>
-            <div>
-              <h3 className="flex items-center gap-1.5 font-medium text-neutral-900 dark:text-neutral-100">
-                {title}
-                <ExternalLink className="size-3.5 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100" />
-              </h3>
-              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{description}</p>
-            </div>
-          </a>
-        ))}
-      </div>
-
-      <p className="mt-6 text-sm text-neutral-500 dark:text-neutral-400">
-        This is a solo-built project without a dedicated support team, so GitHub is the most
-        reliable way to reach the developer.
+    <main className="mx-auto max-w-3xl px-4 pt-8 pb-20 sm:pt-12">
+      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Contact</h1>
+      <p className="mt-3 max-w-[58ch] text-lg text-muted-foreground">
+        LiveFlightWatch is built and run by one person, so there's no support desk. GitHub is the
+        quickest way to get in touch.
       </p>
-    </div>
+
+      <ul className="mt-10 divide-y divide-board-line overflow-hidden rounded-xl bg-board text-board-ink shadow-[0_24px_48px_-24px_rgb(14_16_19/0.55)]">
+        {CHANNELS.map(({ icon: Icon, title, description, href }) => (
+          <li key={href}>
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="group flex items-start gap-4 px-5 py-5 transition-colors hover:bg-white/[0.03] sm:px-6"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-md border border-board-line text-board-amber">
+                <Icon className="size-5" stroke={1.75} aria-hidden={true} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{title}</span>
+                <span className="mt-0.5 block text-sm text-board-muted">{description}</span>
+              </span>
+              <IconArrowUpRight
+                className="mt-1 size-5 shrink-0 text-board-muted transition-colors group-hover:text-board-ink"
+                stroke={1.75}
+                aria-hidden={true}
+              />
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-6 text-sm text-muted-foreground">
+        Links open GitHub in a new tab. Reporting an issue needs a free GitHub account.
+      </p>
+    </main>
   );
 }

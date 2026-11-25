@@ -1,4 +1,4 @@
-import { LocateFixed } from "lucide-react";
+import { IconCurrentLocation } from "@tabler/icons-react";
 
 import type { UseNearestAirportResult } from "@/hooks/useNearestAirport";
 
@@ -18,44 +18,50 @@ export function NearestAirportNotice({
 }: NearestAirportNoticeProps) {
   if (nearestAirport.status === "idle") return null;
 
+  let message: string | null = null;
+  switch (nearestAirport.status) {
+    case "locating":
+      message = "Finding the airport nearest to you…";
+      break;
+    case "found":
+      if (nearestAirport.airport && airportCode === nearestAirport.airport.iata) {
+        message =
+          `Showing flights for ${nearestAirport.airport.name} (${nearestAirport.airport.iata}), ` +
+          `the nearest supported airport, about ${Math.round(nearestAirport.distanceKm ?? 0)} km away.`;
+      }
+      break;
+    case "denied":
+      if (!hasLoadedAirport) {
+        message = "Location access was denied. Enter an airport code below to see live flights.";
+      }
+      break;
+    case "unavailable":
+      if (!hasLoadedAirport) {
+        message = "Your location couldn't be found. Enter an airport code below to see live flights.";
+      }
+      break;
+    case "unsupported":
+      if (!hasLoadedAirport) {
+        message = "This browser can't share your location. Enter an airport code below.";
+      }
+      break;
+    case "out-of-range":
+      if (!hasLoadedAirport) {
+        message = "There's no supported airport near you. Enter an airport code below.";
+      }
+      break;
+  }
+
   return (
-    <div className="mb-4" aria-live="polite">
-      {nearestAirport.status === "locating" && (
-        <p className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
-          <LocateFixed className="size-4 animate-pulse" />
-          Finding the nearest airport to your location…
-        </p>
-      )}
-      {nearestAirport.status === "found" &&
-        nearestAirport.airport &&
-        airportCode === nearestAirport.airport.iata && (
-          <p className="flex items-center gap-2 text-sm text-sky-700 dark:text-sky-400">
-            <LocateFixed className="size-4" />
-            Showing flights for {nearestAirport.airport.name} ({nearestAirport.airport.iata})
-            — the nearest supported airport to your location, about{" "}
-            {Math.round(nearestAirport.distanceKm ?? 0)} km away.
-          </p>
-        )}
-      {nearestAirport.status === "denied" && !hasLoadedAirport && (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Location access was denied — enter an airport code below to see live flights.
-        </p>
-      )}
-      {nearestAirport.status === "unavailable" && !hasLoadedAirport && (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Couldn't determine your location — enter an airport code below to see live
-          flights.
-        </p>
-      )}
-      {nearestAirport.status === "unsupported" && !hasLoadedAirport && (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          Location detection isn't available in this browser — enter an airport code
-          below.
-        </p>
-      )}
-      {nearestAirport.status === "out-of-range" && !hasLoadedAirport && (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          We couldn't find a supported airport near your location — enter one below.
+    <div aria-live="polite" className="min-h-6">
+      {message && (
+        <p className="flex items-start gap-2 text-sm text-muted-foreground">
+          <IconCurrentLocation
+            className={`mt-0.5 size-4 shrink-0 ${nearestAirport.status === "locating" ? "animate-pulse" : ""}`}
+            stroke={1.75}
+            aria-hidden="true"
+          />
+          {message}
         </p>
       )}
     </div>
