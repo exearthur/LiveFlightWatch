@@ -72,6 +72,38 @@ interface FlightsTableProps {
   direction: "departures" | "arrivals";
   emptyTitle?: string;
   emptyDescription?: string;
+  /**
+   * Makes each flight number a button that picks that flight, with the
+   * picked one highlighted. Used by the lookup, where the table lists every
+   * match for a flight number and the cockpit shows one of them.
+   */
+  selection?: {
+    selectedIndex: number;
+    onSelect: (index: number) => void;
+  };
+}
+
+function FlightNumber({
+  flight,
+  index,
+  selection,
+}: {
+  flight: Flight;
+  index: number;
+  selection: FlightsTableProps["selection"];
+}) {
+  if (!selection) return <>{flight.flight_number}</>;
+  const selected = selection.selectedIndex === index;
+  return (
+    <button
+      type="button"
+      onClick={() => selection.onSelect(index)}
+      aria-pressed={selected}
+      className="rounded-sm underline-offset-4 hover:underline"
+    >
+      {flight.flight_number}
+    </button>
+  );
 }
 
 /**
@@ -84,6 +116,7 @@ export function FlightsTable({
   direction,
   emptyTitle,
   emptyDescription,
+  selection,
 }: FlightsTableProps) {
   const now = useNow(DAY_CHECK_INTERVAL_MS);
   const placeLabel = direction === "departures" ? "Destination" : "Origin";
@@ -124,14 +157,18 @@ export function FlightsTable({
               return (
                 <tr
                   key={`${flight.flight_number}-${idx}`}
-                  className={cn("transition-colors hover:bg-white/[0.03]", className)}
+                  className={cn(
+                    "transition-colors hover:bg-white/[0.03]",
+                    selection?.selectedIndex === idx && "bg-white/[0.05]",
+                    className,
+                  )}
                   style={style}
                 >
                   <td className="py-3 pr-4 pl-6 align-top font-mono text-[13px] text-board-ink">
                     <FlightTime value={flight.scheduled_time} timeZone={flight.timezone} now={now} />
                   </td>
                   <td className="px-4 py-3 align-top font-mono text-[13px] font-semibold text-board-amber">
-                    {flight.flight_number}
+                    <FlightNumber flight={flight} index={idx} selection={selection} />
                   </td>
                   <td className="px-4 py-3 align-top font-semibold text-board-ink">
                     {other.name ?? (other.iata || "—")}
@@ -158,9 +195,15 @@ export function FlightsTable({
           const other = direction === "departures" ? flight.destination : flight.origin;
           const { className, style } = cascade(idx);
           return (
-            <li key={`${flight.flight_number}-${idx}`} className={cn("px-4 py-4", className)} style={style}>
+            <li
+              key={`${flight.flight_number}-${idx}`}
+              className={cn("px-4 py-4", selection?.selectedIndex === idx && "bg-white/[0.05]", className)}
+              style={style}
+            >
               <div className="flex items-baseline justify-between gap-3">
-                <p className="font-mono font-semibold text-board-amber">{flight.flight_number}</p>
+                <p className="font-mono font-semibold text-board-amber">
+                  <FlightNumber flight={flight} index={idx} selection={selection} />
+                </p>
                 <StatusLabel status={flight.status} />
               </div>
               <p className="mt-1 text-xs text-board-muted">{placeLabel}</p>
