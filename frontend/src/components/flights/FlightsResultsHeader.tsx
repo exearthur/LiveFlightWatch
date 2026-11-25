@@ -1,7 +1,8 @@
-import { RefreshCw, Star } from "lucide-react";
+import { IconRefresh, IconStar, IconStarFilled } from "@tabler/icons-react";
 
 import { useNow } from "@/hooks/useNow";
 import { timeAgo } from "@/lib/timeAgo";
+import { cn } from "@/lib/utils";
 
 interface FlightsResultsHeaderProps {
   /** Number of results currently shown (after any client-side filters). */
@@ -20,10 +21,13 @@ interface FlightsResultsHeaderProps {
   };
 }
 
+const iconButton =
+  "inline-flex size-9 items-center justify-center rounded-md border border-board-line text-board-ink transition-colors hover:border-board-muted/60 disabled:opacity-50";
+
 /**
  * Status line for a loaded result set: how many results are shown, how old
  * the data is and whether it came from cache, plus the favorite/refresh
- * actions. Rendered inside `FlightSearchForm`, which pushes it to the right.
+ * actions. Sits at the end of the board's control strip.
  *
  * The age is measured from `fetchedAt` against a clock that ticks every
  * second, so it keeps counting between refetches, and while polling is
@@ -41,31 +45,39 @@ export function FlightsResultsHeader({
   const now = useNow();
 
   return (
-    <div className="ml-auto flex items-center gap-3 text-sm text-neutral-500 dark:text-neutral-400">
-      <span>
-        <span className="font-medium text-neutral-700 dark:text-neutral-300">{count}</span>{" "}
-        {countLabel} · updated {timeAgo(fetchedAt, now)}
+    <div className="col-span-2 flex items-center justify-end gap-3 text-sm text-board-muted sm:ml-auto">
+      <span aria-live="polite">
+        <span className="font-mono font-semibold text-board-ink">{count}</span> {countLabel} ·
+        updated {timeAgo(fetchedAt, now)}
         {cached && " (cached)"}
       </span>
       {favorite && (
         <button
+          type="button"
           onClick={favorite.onToggle}
           aria-label={favorite.isFavorite ? "Remove from favorites" : "Save as favorite"}
           aria-pressed={favorite.isFavorite}
-          className="rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          className={cn(iconButton, favorite.isFavorite && "border-board-amber/60 text-board-amber")}
         >
-          <Star
-            className={`size-3.5 ${favorite.isFavorite ? "fill-sky-500 text-sky-500" : ""}`}
-          />
+          {favorite.isFavorite ? (
+            <IconStarFilled className="size-4" aria-hidden="true" />
+          ) : (
+            <IconStar className="size-4" stroke={1.75} aria-hidden="true" />
+          )}
         </button>
       )}
       <button
+        type="button"
         onClick={onRefresh}
         disabled={isFetching}
         aria-label="Refresh"
-        className="rounded-md border border-neutral-300 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+        className={iconButton}
       >
-        <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
+        <IconRefresh
+          className={cn("size-4", isFetching && "animate-spin")}
+          stroke={1.75}
+          aria-hidden="true"
+        />
       </button>
     </div>
   );

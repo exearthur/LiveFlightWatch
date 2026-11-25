@@ -152,7 +152,7 @@ test("a rate-limited API shows the quota state, and a retry recovers", async ({
 
 test("looking up a flight number shows that flight", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "By Flight Number" }).click();
+  await page.getByRole("button", { name: "By flight number" }).click();
   await page.getByLabel(/flight number/i).fill("BA178");
 
   await expectFlights(page, ["BA178"], "results?");

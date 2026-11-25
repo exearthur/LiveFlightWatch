@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FlightsTable } from "@/components/flights/FlightsTable";
+import type { StatusTone } from "@/lib/flightStatus";
 import type { Flight, FlightStatus } from "@/types/flight";
 
 // The table formats times in the viewer's locale. Pin that to en-US here so
@@ -89,20 +90,30 @@ describe("FlightsTable", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 
-  it.each<[FlightStatus, string]>([
-    ["scheduled", "bg-neutral-100"],
-    ["active", "bg-emerald-100"],
-    ["landed", "bg-emerald-100"],
-    ["delayed", "bg-amber-100"],
-    ["cancelled", "bg-red-100"],
-    ["diverted", "bg-red-100"],
-    ["unknown", "bg-neutral-100"],
-  ])("gives the %s status badge the %s background color class", (status, expectedClass) => {
+  it.each<[FlightStatus, StatusTone]>([
+    ["scheduled", "neutral"],
+    ["active", "ok"],
+    ["landed", "ok"],
+    ["delayed", "warn"],
+    ["cancelled", "alert"],
+    ["diverted", "alert"],
+    ["unknown", "neutral"],
+  ])("marks the %s status with the %s tone", (status, expectedTone) => {
+    // This describe block doesn't clean up between tests, and earlier ones
+    // leave "scheduled" flights in the document.
+    cleanup();
     render(<FlightsTable flights={[makeFlight({ status })]} direction="departures" />);
 
-    const badges = screen.getAllByText(status, { exact: false });
-    const badge = badges.find((el) => el.className.includes(expectedClass));
-    expect(badge).toBeDefined();
+    // One status label in the desktop table and one in the mobile layout.
+    // (Matching is loose, so "scheduled" also finds the "Scheduled" column
+    // header, which carries no tone.)
+    const labels = screen
+      .getAllByText(status, { exact: false })
+      .filter((el) => el.hasAttribute("data-tone"));
+    expect(labels).toHaveLength(2);
+    for (const label of labels) {
+      expect(label).toHaveAttribute("data-tone", expectedTone);
+    }
   });
 });
 

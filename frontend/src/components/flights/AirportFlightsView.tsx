@@ -1,4 +1,5 @@
-import { PlaneTakeoff } from "lucide-react";
+import { IconPlaneDeparture } from "@tabler/icons-react";
+import type { ReactNode } from "react";
 
 import { FlightsErrorState } from "@/components/flights/FlightsErrorState";
 import { FlightsTable } from "@/components/flights/FlightsTable";
@@ -19,7 +20,16 @@ interface AirportFlightsViewProps {
   onRetry: () => void;
 }
 
-/** Results area for the "By Airport" search: prompt, validation, loading, error and table. */
+function BoardMessage({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-board-muted">
+      <IconPlaneDeparture className="size-8" stroke={1.5} aria-hidden="true" />
+      <p>{children}</p>
+    </div>
+  );
+}
+
+/** Body of the board for the "By airport" search: prompt, validation, loading, error and table. */
 export function AirportFlightsView({
   airportCode,
   isValidAirport,
@@ -34,17 +44,12 @@ export function AirportFlightsView({
   return (
     <>
       {airportCode.length > 0 && !isValidAirport && (
-        <p className="text-sm text-red-600 dark:text-red-400">
+        <p className="px-6 py-6 text-sm text-board-red">
           Enter a valid 3-letter IATA airport code.
         </p>
       )}
 
-      {!airportCode && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-300 py-16 text-center text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-          <PlaneTakeoff className="size-8 text-neutral-400 dark:text-neutral-600" />
-          <p>Enter an airport code above to see live flights.</p>
-        </div>
-      )}
+      {!airportCode && <BoardMessage>Enter an airport code above to see live flights.</BoardMessage>}
 
       {isValidAirport && isLoading && <FlightsTableSkeleton />}
 
@@ -53,14 +58,13 @@ export function AirportFlightsView({
       )}
 
       {isValidAirport && flights && !isError && isFilteredEmpty && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-300 py-16 text-center text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-          <PlaneTakeoff className="size-8 text-neutral-400 dark:text-neutral-600" />
-          <p>No flights match the selected filters.</p>
-        </div>
+        <BoardMessage>No flights match the selected filters.</BoardMessage>
       )}
 
       {isValidAirport && flights && !isError && !isFilteredEmpty && (
-        <FlightsTable flights={flights} direction={direction} />
+        // Keyed by board so the row cascade plays once per airport and
+        // direction, not on every poll or filter change.
+        <FlightsTable key={`${airportCode}-${direction}`} flights={flights} direction={direction} />
       )}
     </>
   );

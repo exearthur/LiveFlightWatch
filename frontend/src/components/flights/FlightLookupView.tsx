@@ -1,4 +1,4 @@
-import { Hash } from "lucide-react";
+import { IconHash } from "@tabler/icons-react";
 
 import { FlightsErrorState } from "@/components/flights/FlightsErrorState";
 import { FlightsTable } from "@/components/flights/FlightsTable";
@@ -16,7 +16,7 @@ interface FlightLookupViewProps {
   onRetry: () => void;
 }
 
-/** Results area for the "By Flight Number" search: prompt, validation, loading, error and table. */
+/** Body of the board for the "By flight number" search: prompt, validation, loading, error and table. */
 export function FlightLookupView({
   flightNumber,
   isValidFlightNumber,
@@ -29,14 +29,14 @@ export function FlightLookupView({
   return (
     <>
       {flightNumber.length > 0 && !isValidFlightNumber && (
-        <p className="text-sm text-red-600 dark:text-red-400">
-          Enter a valid flight number (e.g. AA100).
+        <p className="px-6 py-6 text-sm text-board-red">
+          Enter a valid flight number, such as AA100.
         </p>
       )}
 
       {!flightNumber && (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-300 py-16 text-center text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-          <Hash className="size-8 text-neutral-400 dark:text-neutral-600" />
+        <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-board-muted">
+          <IconHash className="size-8" stroke={1.5} aria-hidden="true" />
           <p>Enter a flight number above to look up its status.</p>
         </div>
       )}
@@ -44,19 +44,16 @@ export function FlightLookupView({
       {isValidFlightNumber && isLoading && <FlightsTableSkeleton />}
 
       {isValidFlightNumber && isError && (
-        <FlightsErrorState
-          error={error}
-          title="Couldn't look up that flight"
-          onRetry={onRetry}
-        />
+        <FlightsErrorState error={error} title="Couldn't look up that flight" onRetry={onRetry} />
       )}
 
       {isValidFlightNumber && flights && !isError && (
         <FlightsTable
+          key={flightNumber}
           flights={flights}
           direction="departures"
           emptyTitle="No flight found"
-          emptyDescription="Check the flight number and try again — it may not be operating today."
+          emptyDescription="Check the flight number. The flight may not be operating today."
         />
       )}
     </>

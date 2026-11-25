@@ -386,7 +386,7 @@ describe("Flights page — nearest-airport detection", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Location access was denied — enter an airport code below/),
+        screen.getByText(/Location access was denied\. Enter an airport code below/),
       ).toBeInTheDocument(),
     );
     expect(mockedGetFlights).not.toHaveBeenCalled();
