@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AirportFlightsView } from "@/components/flights/AirportFlightsView";
+import { BoardWeather } from "@/components/flights/BoardWeather";
 import { FlightDrawer } from "@/components/flights/FlightDrawer";
 import { FlightLookupView } from "@/components/flights/FlightLookupView";
 import { FlightSearchForm, type SearchMode } from "@/components/flights/FlightSearchForm";
@@ -89,6 +90,7 @@ function BoardHeader({
   flapSize,
   title,
   subtitle,
+  extra,
   aside,
 }: {
   flapText: string;
@@ -96,6 +98,8 @@ function BoardHeader({
   flapSize: "md" | "lg" | "xl";
   title: string;
   subtitle?: string;
+  /** Shown under the title, e.g. the airport's weather. */
+  extra?: ReactNode;
   aside?: ReactNode;
 }) {
   return (
@@ -106,6 +110,7 @@ function BoardHeader({
           {title}
         </p>
         {subtitle && <p className="text-sm text-board-muted">{subtitle}</p>}
+        {extra}
       </div>
       {aside}
     </div>
@@ -327,6 +332,7 @@ export default function Flights() {
             flapSize="xl"
             title={airportTitle}
             subtitle={airportSubtitle}
+            extra={<BoardWeather airport={isValidAirport ? airportInput : null} />}
             aside={
               <SegmentedControl
                 label="Direction"

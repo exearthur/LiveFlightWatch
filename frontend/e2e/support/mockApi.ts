@@ -7,6 +7,7 @@ import {
   INVALID_REQUEST_BODY,
   NOT_FOUND_BODY,
   RATE_LIMITED_BODY,
+  weatherResponse,
 } from "../fixtures/flights";
 
 // The same query validation the FastAPI routes apply (backend/app/routers/flights.py).
@@ -67,6 +68,17 @@ export async function installMockApi(page: Page): Promise<MockApi> {
         if (FLIGHT_NUMBER_PATTERN.test(flightNumber)) {
           if (quotaExhausted) return json(route, 429, RATE_LIMITED_BODY);
           return json(route, 200, flightLookupResponse(flightNumber.toUpperCase()));
+        }
+        unexpectedRequests.push(summary);
+        return json(route, 422, INVALID_REQUEST_BODY);
+      }
+
+      // Weather comes from a separate, free source, so the flight quota
+      // doesn't apply to it.
+      if (request.method() === "GET" && url.pathname === "/api/weather") {
+        const airport = url.searchParams.get("airport") ?? "";
+        if (AIRPORT_PATTERN.test(airport)) {
+          return json(route, 200, weatherResponse(airport.toUpperCase()));
         }
         unexpectedRequests.push(summary);
         return json(route, 422, INVALID_REQUEST_BODY);

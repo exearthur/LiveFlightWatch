@@ -1,13 +1,24 @@
-import { IconPlaneInflight } from "@tabler/icons-react";
+import { IconArrowNarrowUp, IconPlaneInflight } from "@tabler/icons-react";
 import { MotionConfig, motion, useReducedMotion, useSpring, useTransform } from "motion/react";
 import { useEffect, type ReactNode } from "react";
 
 import { AirlineLogo } from "@/components/flights/AirlineLogo";
 import { useNow } from "@/hooks/useNow";
+import { useWeather } from "@/hooks/useWeather";
+import { ApiError } from "@/lib/api";
+import { timeAgo } from "@/lib/timeAgo";
+import {
+  CATEGORY_NAME,
+  CATEGORY_TONE,
+  describeClouds,
+  describeVisibility,
+  describeWind,
+  toFahrenheit,
+} from "@/lib/weather";
 import { STATUS_TONE, delayMinutes, type StatusTone } from "@/lib/flightStatus";
 import { formatFlightTime } from "@/lib/flightTime";
 import { cn } from "@/lib/utils";
-import type { Flight, FlightStatus } from "@/types/flight";
+import type { Flight, FlightStatus, Weather } from "@/types/flight";
 
 /*
  * The flight-number lookup, drawn as a flight deck: one aircraft's state on a
@@ -34,10 +45,13 @@ const TONE_LIT: Record<StatusTone, string> = {
 /** A framed instrument with its name in the corner. */
 function Instrument({
   label,
+  aside,
   className,
   children,
 }: {
   label: string;
+  /** Shown at the right of the instrument's name, e.g. a badge. */
+  aside?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
@@ -46,7 +60,10 @@ function Instrument({
       aria-label={label}
       className={cn("rounded-lg border border-board-line bg-board-raised/50 p-4 sm:p-5", className)}
     >
-      <h3 className="mb-3 text-xs text-board-muted">{label}</h3>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-xs text-board-muted">{label}</h3>
+        {aside}
+      </div>
       {children}
     </section>
   );
@@ -304,8 +321,10 @@ function TimeValue({ value, flight, now }: { value: string | null; flight: Fligh
   if (!label || !value) return <span className="text-board-muted">—</span>;
   return (
     <>
-      <time dateTime={value}>{label.time}</time>
-      {label.date && <span className="ml-1.5 text-xs text-board-muted">{label.date}</span>}
+      <time dateTime={value} className="whitespace-nowrap">
+        {label.time}
+      </time>
+      {label.date && <span className="ml-1.5 text-xs whitespace-nowrap text-board-muted">{label.date}</span>}
     </>
   );
 }
@@ -351,6 +370,109 @@ function Readouts({ flight, leg }: { flight: Flight; leg: FlightLeg }) {
   );
 }
 
+// ── Weather ──────────────────────────────────────────────────────────
+
+function WeatherInstrument({ airport }: { airport: string }) {
+  const { data, isLoading, error } = useWeather(airport);
+  const now = useNow(30_000);
+  const label = `Weather at ${airport || "the airport"}`;
+  const weather = data?.weather;
+  const category = weather?.flight_category ?? null;
+
+  return (
+    <Instrument
+      label={label}
+      className="lg:col-span-6"
+      aside={
+        category && (
+          <span
+            title={CATEGORY_NAME[category]}
+            className={cn(
+              "rounded-[4px] border px-1.5 py-0.5 font-mono text-[11px] font-semibold",
+              TONE_LIT[CATEGORY_TONE[category]],
+            )}
+          >
+            {category}
+          </span>
+        )
+      }
+    >
+      {isLoading && (
+        <div aria-busy="true" className="space-y-3">
+          <div className="h-8 w-24 animate-pulse rounded bg-board-raised" />
+          <div className="h-3 w-48 animate-pulse rounded bg-board-raised" />
+        </div>
+      )}
+
+      {!isLoading && !weather && (
+        <p className="text-sm text-board-muted">
+          {error instanceof ApiError && error.status === 404
+            ? `No current weather report for ${airport}.`
+            : "Weather isn't available right now."}
+        </p>
+      )}
+
+      {weather && (
+        <>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <p className="font-mono text-3xl font-semibold text-board-ink">
+              {weather.temperature_c === null ? "—" : `${Math.round(weather.temperature_c)}°C`}
+              {weather.temperature_c !== null && (
+                <span className="ml-2 text-base font-normal text-board-muted">
+                  {toFahrenheit(weather.temperature_c)}°F
+                </span>
+              )}
+            </p>
+            <WindReadout weather={weather} />
+          </div>
+
+          <dl className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Readout label="Visibility">{describeVisibility(weather.visibility_sm) ?? "—"}</Readout>
+            <Readout label="Clouds">
+              <span className="font-sans text-sm">{describeClouds(weather.clouds) ?? "—"}</span>
+            </Readout>
+            <Readout label="Pressure">
+              {weather.altimeter_hpa === null ? "—" : `${Math.round(weather.altimeter_hpa)} hPa`}
+            </Readout>
+          </dl>
+
+          <details className="group mt-3 text-sm">
+            <summary className="cursor-pointer text-board-muted marker:text-board-muted hover:text-board-ink">
+              Observed {timeAgo(weather.observed_at, now)}. Show the raw report
+            </summary>
+            <code className="mt-2 block rounded-md bg-black/30 px-3 py-2 font-mono text-xs leading-relaxed break-words text-board-ink">
+              {weather.raw}
+            </code>
+          </details>
+        </>
+      )}
+    </Instrument>
+  );
+}
+
+/** Wind as an arrow pointing the way it blows, with the reading in words. */
+function WindReadout({ weather }: { weather: Weather }) {
+  const text = describeWind(weather);
+  if (!text) return null;
+  const direction = weather.wind_variable ? null : weather.wind_direction_deg;
+  return (
+    <p className="flex items-center gap-2 text-sm text-board-ink">
+      {direction !== null && (weather.wind_speed_kt ?? 0) > 0 && (
+        <span className="flex size-8 items-center justify-center rounded-full border border-board-line">
+          {/* The report gives where the wind comes from; the arrow shows where it goes. */}
+          <IconArrowNarrowUp
+            className="size-4 text-board-amber"
+            stroke={2}
+            style={{ transform: `rotate(${direction + 180}deg)` }}
+            aria-hidden="true"
+          />
+        </span>
+      )}
+      <span>Wind {text.charAt(0).toLowerCase() + text.slice(1)}</span>
+    </p>
+  );
+}
+
 // ── The deck ─────────────────────────────────────────────────────────
 
 interface FlightCockpitProps {
@@ -371,6 +493,8 @@ export function FlightCockpit({ flight, leg = "departure", action }: FlightCockp
         <StatusAnnunciator status={flight.status} />
         <DelayGauge flight={flight} />
         <Readouts flight={flight} leg={leg} />
+        <WeatherInstrument airport={flight.origin.iata} />
+        <WeatherInstrument airport={flight.destination.iata} />
       </div>
     </MotionConfig>
   );

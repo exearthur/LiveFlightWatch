@@ -8,6 +8,7 @@ import type {
   FlightDirection,
   FlightLookupResponse,
   FlightsResponse,
+  WeatherResponse,
 } from "@/types/flight";
 
 const JFK: Airport = { iata: "JFK", name: "John F Kennedy International" };
@@ -172,3 +173,32 @@ export const RATE_LIMITED_BODY = {
 };
 export const INVALID_REQUEST_BODY = { detail: "Invalid query parameters" };
 export const NOT_FOUND_BODY = { detail: "Not Found" };
+
+/**
+ * `GET /api/weather?airport=`. Every airport gets the same mild, clear report,
+ * under a made-up station code, since the smoke tests don't check weather.
+ */
+export function weatherResponse(airport: string): WeatherResponse {
+  const observedAt = new Date(Date.now() - 12 * 60_000);
+  return {
+    airport,
+    fetched_at: new Date().toISOString(),
+    cached: false,
+    weather: {
+      station: `X${airport}`,
+      station_name: null,
+      observed_at: observedAt.toISOString(),
+      raw: `METAR X${airport} 251651Z 27012KT 10SM FEW040 08/M02 A3012`,
+      flight_category: "VFR",
+      temperature_c: 8,
+      dewpoint_c: -2,
+      wind_direction_deg: 270,
+      wind_variable: false,
+      wind_speed_kt: 12,
+      wind_gust_kt: null,
+      visibility_sm: "10+",
+      altimeter_hpa: 1020,
+      clouds: [{ cover: "FEW", base_ft: 4000 }],
+    },
+  };
+}

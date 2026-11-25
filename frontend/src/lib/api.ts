@@ -1,4 +1,9 @@
-import type { FlightDirection, FlightLookupResponse, FlightsResponse } from "@/types/flight";
+import type {
+  FlightDirection,
+  FlightLookupResponse,
+  FlightsResponse,
+  WeatherResponse,
+} from "@/types/flight";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -35,6 +40,21 @@ export async function getFlightByNumber(flightNumber: string): Promise<FlightLoo
   const response = await fetch(
     `${API_URL}/api/flights/lookup?flight_number=${encodeURIComponent(flightNumber)}`,
   );
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(
+      body?.detail ?? `Request failed with status ${response.status}`,
+      response.status,
+    );
+  }
+
+  return response.json();
+}
+
+/** The airport's current weather report (METAR), by IATA code. 404 when it has none. */
+export async function getWeather(airport: string): Promise<WeatherResponse> {
+  const response = await fetch(`${API_URL}/api/weather?airport=${encodeURIComponent(airport)}`);
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);

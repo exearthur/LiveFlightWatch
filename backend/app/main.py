@@ -11,6 +11,8 @@ from app.core.redaction import SecretRedactor
 from app.errors import register_error_handlers
 from app.routers.flights import build_flight_service
 from app.routers.flights import router as flights_router
+from app.routers.weather import build_weather_service
+from app.routers.weather import router as weather_router
 
 
 def create_app(
@@ -33,10 +35,12 @@ def create_app(
             async with http_client_factory() as http_client:
                 app.state.http_client = http_client
                 app.state.flight_service = build_flight_service(settings, http_client)
+                app.state.weather_service = build_weather_service(settings, http_client)
                 try:
                     yield
                 finally:
                     # Nothing may keep using the client once it is closed.
+                    del app.state.weather_service
                     del app.state.flight_service
                     del app.state.http_client
 
@@ -51,6 +55,7 @@ def create_app(
 
     register_error_handlers(app, redactor)
     app.include_router(flights_router)
+    app.include_router(weather_router)
     return app
 
 

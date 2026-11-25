@@ -14,6 +14,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
     ...actual,
     getFlights: vi.fn(),
     getFlightByNumber: vi.fn(),
+    // Weather isn't under test here; answer "no report" so it stays out of the way.
+    getWeather: vi.fn(() => Promise.reject(new actual.ApiError("No report", 404))),
   };
 });
 
