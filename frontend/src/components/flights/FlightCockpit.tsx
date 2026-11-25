@@ -2,6 +2,7 @@ import { IconPlaneInflight } from "@tabler/icons-react";
 import { MotionConfig, motion, useReducedMotion, useSpring, useTransform } from "motion/react";
 import { useEffect, type ReactNode } from "react";
 
+import { AirlineLogo } from "@/components/flights/AirlineLogo";
 import { useNow } from "@/hooks/useNow";
 import { STATUS_TONE, delayMinutes, type StatusTone } from "@/lib/flightStatus";
 import { formatFlightTime } from "@/lib/flightTime";
@@ -60,14 +61,20 @@ function routePosition(status: FlightStatus): number {
   return 0;
 }
 
-function RouteDisplay({ flight }: { flight: Flight }) {
+function RouteDisplay({ flight, action }: { flight: Flight; action?: ReactNode }) {
   const position = routePosition(flight.status);
   const tone = STATUS_TONE[flight.status];
   const isBroken = flight.status === "cancelled" || flight.status === "diverted";
 
   return (
     <Instrument label="Route" className="lg:col-span-7">
-      <p className="text-board-muted">{flight.airline ?? "Unknown airline"}</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="flex items-center gap-3 text-board-muted">
+          <AirlineLogo flightNumber={flight.flight_number} airline={flight.airline} />
+          <span>{flight.airline ?? "Unknown airline"}</span>
+        </p>
+        {action}
+      </div>
       <div className="mt-4 grid grid-cols-[auto_1fr_auto] items-center gap-4">
         <p className="font-mono text-3xl font-semibold text-board-ink sm:text-4xl">
           {flight.origin.iata || "—"}
@@ -303,12 +310,19 @@ function TimeValue({ value, flight, now }: { value: string | null; flight: Fligh
   );
 }
 
-function Readouts({ flight }: { flight: Flight }) {
+/**
+ * Which end of the trip the flight's times belong to: a departures board and
+ * a lookup give departure times at the origin, an arrivals board gives
+ * arrival times at the destination.
+ */
+export type FlightLeg = "departure" | "arrival";
+
+function Readouts({ flight, leg }: { flight: Flight; leg: FlightLeg }) {
   const now = useNow();
   const localClock = formatFlightTime(new Date(now).toISOString(), flight.timezone, { now });
 
   return (
-    <Instrument label="Departure" className="lg:col-span-8">
+    <Instrument label={leg === "arrival" ? "Arrival" : "Departure"} className="lg:col-span-8">
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Readout label="Scheduled">
           <TimeValue value={flight.scheduled_time} flight={flight} now={now} />
@@ -327,7 +341,9 @@ function Readouts({ flight }: { flight: Flight }) {
             <span className="text-board-muted">—</span>
           )}
         </Readout>
-        <Readout label={`Local time at ${flight.origin.iata || "origin"}`}>
+        <Readout
+          label={`Local time at ${(leg === "arrival" ? flight.destination.iata : flight.origin.iata) || "the airport"}`}
+        >
           {localClock?.time ?? "—"}
         </Readout>
       </dl>
@@ -337,16 +353,24 @@ function Readouts({ flight }: { flight: Flight }) {
 
 // ── The deck ─────────────────────────────────────────────────────────
 
-export function FlightCockpit({ flight }: { flight: Flight }) {
+interface FlightCockpitProps {
+  flight: Flight;
+  /** Which end of the trip the times describe. Defaults to departure. */
+  leg?: FlightLeg;
+  /** Shown beside the airline, e.g. a save button. */
+  action?: ReactNode;
+}
+
+export function FlightCockpit({ flight, leg = "departure", action }: FlightCockpitProps) {
   return (
     // "user": the needle and aircraft jump straight to their reading when
     // the viewer has asked for reduced motion.
     <MotionConfig reducedMotion="user">
       <div className="grid gap-3 p-4 sm:p-6 lg:grid-cols-12">
-        <RouteDisplay flight={flight} />
+        <RouteDisplay flight={flight} action={action} />
         <StatusAnnunciator status={flight.status} />
         <DelayGauge flight={flight} />
-        <Readouts flight={flight} />
+        <Readouts flight={flight} leg={leg} />
       </div>
     </MotionConfig>
   );

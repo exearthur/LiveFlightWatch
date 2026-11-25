@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AirportFlightsView } from "@/components/flights/AirportFlightsView";
+import { FlightDrawer } from "@/components/flights/FlightDrawer";
 import { FlightLookupView } from "@/components/flights/FlightLookupView";
 import { FlightSearchForm, type SearchMode } from "@/components/flights/FlightSearchForm";
 import { FlightsResultsHeader } from "@/components/flights/FlightsResultsHeader";
@@ -124,8 +125,15 @@ export default function Flights() {
     (searchParams.get("status") as FlightStatus | null) ?? ALL_STATUSES;
   const destinationInput = searchParams.get("destination") ?? "";
   const flightNumberInput = (searchParams.get("flight") ?? "").toUpperCase();
+  // The board flight open in the cockpit drawer, by flight number.
+  const selectedFlightNumber = (searchParams.get("selected") ?? "").toUpperCase();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  function updateParams(patch: Record<string, string | null>, options?: { push?: boolean }) {
+  function updateParams(
+    patch: Record<string, string | null>,
+    options?: { push?: boolean; state?: unknown },
+  ) {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -138,7 +146,7 @@ export default function Flights() {
       // Continuous typing uses `replace` so every keystroke doesn't spam
       // browser history; discrete selections (dropdowns/buttons) `push` so
       // the back button can undo one filter change at a time.
-      { replace: !options?.push },
+      { replace: !options?.push, state: options?.state },
     );
   }
 
@@ -186,8 +194,11 @@ export default function Flights() {
     }
   };
 
+  // Each query only runs on its own tab. The URL keeps both tabs' inputs, so
+  // without this a lookup left in the URL would keep polling the API (and
+  // spending quota) behind the airport board, and the reverse.
   const { data, isLoading, isFetching, isError, error, refetch } = useFlights(
-    airportInput,
+    mode === "airport" ? airportInput : "",
     direction,
   );
   const hasLoadedAirport = isValidAirport && !!data;
@@ -198,7 +209,7 @@ export default function Flights() {
     isError: isLookupError,
     error: lookupError,
     refetch: refetchLookup,
-  } = useFlightLookup(flightNumberInput);
+  } = useFlightLookup(mode === "flight" ? flightNumberInput : "");
   const { recentAirports, addRecentAirport } = useRecentAirports();
   const { addFavorite, removeFavorite, isFavorite } = useFavorites();
 
@@ -243,6 +254,25 @@ export default function Flights() {
     (selectedAirline !== ALL_AIRLINES || selectedStatus !== ALL_STATUSES || isDestinationFilterActive) &&
     !!data &&
     filteredFlights.length === 0;
+
+  // Opening a flight pushes a history entry marked as the drawer's, so Back
+  // closes it. Closing goes back over that entry when there is one, and
+  // otherwise (a shared link opened straight to a flight) just drops the
+  // parameter.
+  const openFlight = (index: number) => {
+    const flight = filteredFlights[index];
+    if (!flight) return;
+    updateParams({ selected: flight.flight_number }, { push: true, state: { flightDrawer: true } });
+  };
+  const closeFlight = () => {
+    const state = location.state as { flightDrawer?: boolean } | null;
+    if (state?.flightDrawer) navigate(-1);
+    else updateParams({ selected: null });
+  };
+  const selectedFlight =
+    mode === "airport" && selectedFlightNumber && data
+      ? data.flights.find((flight) => flight.flight_number.toUpperCase() === selectedFlightNumber)
+      : undefined;
 
   const airportTitle = matchedAirport
     ? matchedAirport.name
@@ -372,6 +402,7 @@ export default function Flights() {
             isError={isError}
             error={error}
             onRetry={() => refetch()}
+            onSelectFlight={openFlight}
           />
         )}
 
@@ -387,6 +418,12 @@ export default function Flights() {
           />
         )}
       </section>
+
+      <FlightDrawer
+        flight={selectedFlight}
+        leg={direction === "arrivals" ? "arrival" : "departure"}
+        onClose={closeFlight}
+      />
     </main>
   );
 }

@@ -5,6 +5,7 @@ import { FlightCockpit } from "@/components/flights/FlightCockpit";
 import { FlightsErrorState } from "@/components/flights/FlightsErrorState";
 import { FlightsTable } from "@/components/flights/FlightsTable";
 import { RadarScan } from "@/components/flights/RadarScan";
+import { SaveFlightButton } from "@/components/flights/SaveFlightButton";
 import type { Flight } from "@/types/flight";
 
 interface FlightLookupViewProps {
@@ -30,7 +31,7 @@ function LookupResults({ flights }: { flights: Flight[] }) {
 
   return (
     <>
-      <FlightCockpit flight={flights[index]} />
+      <FlightCockpit flight={flights[index]} action={<SaveFlightButton flight={flights[index]} />} />
       <div className="border-t border-board-line">
         <div className="px-4 pt-5 pb-1 sm:px-6">
           <h3 className="text-sm font-semibold text-board-ink">Flight log</h3>

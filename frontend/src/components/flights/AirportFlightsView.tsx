@@ -18,6 +18,8 @@ interface AirportFlightsViewProps {
   isError: boolean;
   error: unknown;
   onRetry: () => void;
+  /** Opens one of the shown flights in the cockpit, by its index in `flights`. */
+  onSelectFlight: (index: number) => void;
 }
 
 function BoardMessage({ children }: { children: ReactNode }) {
@@ -40,6 +42,7 @@ export function AirportFlightsView({
   isError,
   error,
   onRetry,
+  onSelectFlight,
 }: AirportFlightsViewProps) {
   return (
     <>
@@ -64,7 +67,12 @@ export function AirportFlightsView({
       {isValidAirport && flights && !isError && !isFilteredEmpty && (
         // Keyed by board so the row cascade plays once per airport and
         // direction, not on every poll or filter change.
-        <FlightsTable key={`${airportCode}-${direction}`} flights={flights} direction={direction} />
+        <FlightsTable
+          key={`${airportCode}-${direction}`}
+          flights={flights}
+          direction={direction}
+          selection={{ onSelect: onSelectFlight, hint: "Open in the cockpit" }}
+        />
       )}
     </>
   );

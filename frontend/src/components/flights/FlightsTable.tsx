@@ -1,6 +1,7 @@
 import { IconPlaneTilt } from "@tabler/icons-react";
 import type { CSSProperties } from "react";
 
+import { AirlineLogo } from "@/components/flights/AirlineLogo";
 import { useNow } from "@/hooks/useNow";
 import { STATUS_TONE, type StatusTone } from "@/lib/flightStatus";
 import { formatFlightTime } from "@/lib/flightTime";
@@ -73,13 +74,16 @@ interface FlightsTableProps {
   emptyTitle?: string;
   emptyDescription?: string;
   /**
-   * Makes each flight number a button that picks that flight, with the
-   * picked one highlighted. Used by the lookup, where the table lists every
-   * match for a flight number and the cockpit shows one of them.
+   * Makes each row pick its flight: clicking the row, or its flight number
+   * (a button, for keyboard users). The board uses it to open a flight in the
+   * cockpit; the lookup to choose which match the cockpit shows, with
+   * `selectedIndex` highlighting the current one.
    */
   selection?: {
-    selectedIndex: number;
+    selectedIndex?: number;
     onSelect: (index: number) => void;
+    /** Tooltip for the flight-number button, e.g. "Open in the cockpit". */
+    hint?: string;
   };
 }
 
@@ -93,12 +97,16 @@ function FlightNumber({
   selection: FlightsTableProps["selection"];
 }) {
   if (!selection) return <>{flight.flight_number}</>;
-  const selected = selection.selectedIndex === index;
   return (
     <button
       type="button"
-      onClick={() => selection.onSelect(index)}
-      aria-pressed={selected}
+      onClick={(event) => {
+        // The row handles clicks too; don't pick the flight twice.
+        event.stopPropagation();
+        selection.onSelect(index);
+      }}
+      aria-pressed={selection.selectedIndex === undefined ? undefined : selection.selectedIndex === index}
+      title={selection.hint}
       className="rounded-sm underline-offset-4 hover:underline"
     >
       {flight.flight_number}
@@ -140,7 +148,7 @@ export function FlightsTable({
       <div className="hidden max-h-[70vh] overflow-auto md:block">
         <table className="w-full text-left text-[15px]">
           <thead className="sticky top-0 z-10 bg-board text-xs text-board-muted">
-            <tr className="border-b border-board-line">
+            <tr className="border-b border-board-line whitespace-nowrap">
               <th className="py-3 pr-4 pl-6 font-normal">Scheduled</th>
               <th className="px-4 py-3 font-normal">Flight</th>
               <th className="px-4 py-3 font-normal">{placeLabel}</th>
@@ -159,12 +167,14 @@ export function FlightsTable({
                   key={`${flight.flight_number}-${idx}`}
                   className={cn(
                     "transition-colors hover:bg-white/[0.03]",
+                    selection && "cursor-pointer",
                     selection?.selectedIndex === idx && "bg-white/[0.05]",
                     className,
                   )}
                   style={style}
+                  onClick={selection ? () => selection.onSelect(idx) : undefined}
                 >
-                  <td className="py-3 pr-4 pl-6 align-top font-mono text-[13px] text-board-ink">
+                  <td className="py-3 pr-4 pl-6 align-top font-mono text-[13px] whitespace-nowrap text-board-ink">
                     <FlightTime value={flight.scheduled_time} timeZone={flight.timezone} now={now} />
                   </td>
                   <td className="px-4 py-3 align-top font-mono text-[13px] font-semibold text-board-amber">
@@ -173,11 +183,16 @@ export function FlightsTable({
                   <td className="px-4 py-3 align-top font-semibold text-board-ink">
                     {other.name ?? (other.iata || "—")}
                   </td>
-                  <td className="px-4 py-3 align-top text-sm text-board-muted">{flight.airline ?? "—"}</td>
-                  <td className="px-4 py-3 align-top font-mono text-[13px] text-board-ink">
+                  <td className="px-4 py-3 align-top text-sm text-board-muted">
+                    <span className="flex items-center gap-3 whitespace-nowrap">
+                      <AirlineLogo flightNumber={flight.flight_number} airline={flight.airline} />
+                      <span>{flight.airline ?? "—"}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 align-top font-mono text-[13px] whitespace-nowrap text-board-ink">
                     <FlightTime value={flight.estimated_time} timeZone={flight.timezone} now={now} />
                   </td>
-                  <td className="px-4 py-3 align-top font-mono text-[13px] text-board-ink">
+                  <td className="px-4 py-3 align-top font-mono text-[13px] whitespace-nowrap text-board-ink">
                     {gateLabel(flight)}
                   </td>
                   <td className="py-3 pr-6 pl-4 align-top">
@@ -197,8 +212,14 @@ export function FlightsTable({
           return (
             <li
               key={`${flight.flight_number}-${idx}`}
-              className={cn("px-4 py-4", selection?.selectedIndex === idx && "bg-white/[0.05]", className)}
+              className={cn(
+                "px-4 py-4",
+                selection && "cursor-pointer",
+                selection?.selectedIndex === idx && "bg-white/[0.05]",
+                className,
+              )}
               style={style}
+              onClick={selection ? () => selection.onSelect(idx) : undefined}
             >
               <div className="flex items-baseline justify-between gap-3">
                 <p className="font-mono font-semibold text-board-amber">
@@ -208,7 +229,10 @@ export function FlightsTable({
               </div>
               <p className="mt-1 text-xs text-board-muted">{placeLabel}</p>
               <p className="font-semibold text-board-ink">{other.name ?? (other.iata || "—")}</p>
-              <p className="text-sm text-board-muted">{flight.airline ?? "—"}</p>
+              <p className="mt-1 flex items-center gap-2 text-sm text-board-muted">
+                <AirlineLogo flightNumber={flight.flight_number} airline={flight.airline} className="w-12" />
+                <span>{flight.airline ?? "—"}</span>
+              </p>
 
               <dl className="mt-3 grid grid-cols-3 gap-3 font-mono text-sm text-board-ink">
                 <div>
